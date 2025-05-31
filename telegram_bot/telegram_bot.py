@@ -60,10 +60,10 @@ async def route_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if is_user_authorized(user):
         curio_application_route_endpint_url = get_curio_application_route_endpoint()
         payload = {
-            "user_id": user.id, 
-            "input_text": update.message.text
+            "telegram_id": user.id, 
+            "user_message": update.message.text
         }
-        requests.post(curio_application_route_endpint_url, payload)
+        requests.post(curio_application_route_endpint_url, json=payload)
     else:
         await update.message.reply_text("Sorry, I am not allowed to help your right now 😔... You have to ask my admin to register you and then I can help you ☺️")
     

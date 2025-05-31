@@ -17,7 +17,7 @@ def route_telegram_user_message(user_message: str, telegram_id: int) -> None:
         "user_message": user_message
     }
 
-    requests.post(agent_endpoint_url, payload)
+    requests.post(agent_endpoint_url, json=payload)
 
 
 def route_agent_message(agent_message: str, agent_id: str) -> None:
@@ -65,7 +65,7 @@ def route_agent_message_to_telegram(agent_message: str, agent_id: str) -> None:
         "disable_web_page_preview": False
     }
 
-    requests.post(telegram_url, payload)
+    requests.post(telegram_url, json=payload)
 
 
 def get_user_telegram_id_from_agent_id(agent_id: str) -> int:

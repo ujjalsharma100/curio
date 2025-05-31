@@ -33,8 +33,10 @@ def route_telegram_user_message():
         user_message = data['user_message']
         telegram_id = data['telegram_id']
         message_router.route_telegram_user_message(user_message, telegram_id)
+        return jsonify({"message": "telegram message routed"}), 200
     except Exception as e:
         print(e)
+        return jsonify({"message": "Error happened!"}), 400
 
 @app.route('/route_agent_message', methods=['POST'])
 def route_agent_message():
@@ -63,8 +65,10 @@ def route_agent_message():
         agent_message = data['agent_message']
         agent_id = data['agent_id']
         message_router.route_agent_message(agent_message, agent_id)
+        return jsonify({"message": "agent message routed"}), 200
     except Exception as e:
         print(e)
+        return jsonify({"message": "Error happened"}), 400
 
 
 if __name__ == '__main__':
