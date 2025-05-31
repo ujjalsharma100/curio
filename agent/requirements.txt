@@ -4,3 +4,4 @@ requests
 anthropic
 feedparser
 bs4
+ollama
