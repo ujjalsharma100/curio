@@ -46,6 +46,8 @@ class AiPerson:
             {self.memory.get_current_conversation_prompt()}
             - Expected Resonse
             Base on the current converstaion, respond what should be the next action from the available actions.
+            Analyze and Understand the most recent ask/want from human from the converstaion, not some previous ask.
+            The past converstational history is for better understanding of the context.
             Incorporate the details and information provided in each section.
             Response should be a json string of the following structure:
             {response_structure_str}

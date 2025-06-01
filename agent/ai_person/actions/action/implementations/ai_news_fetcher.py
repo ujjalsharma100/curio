@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import time
+import os
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
@@ -28,8 +29,9 @@ SOURCES = [
 
 
 def load_existing_articles(filename="ai_news_curated.json"):
+    filepath = os.path.join(os.path.dirname(__file__), filename)
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return []
@@ -89,7 +91,8 @@ def fetch_all_sources(existing_links):
 
 
 def save_to_json(all_articles, filename="ai_news_curated.json"):
-    with open(filename, "w", encoding="utf-8") as f:
+    filepath = os.path.join(os.path.dirname(__file__), filename)
+    with open(filepath, "w", encoding="utf-8") as f:
         json.dump(all_articles, f, indent=2, ensure_ascii=False)
 
 
@@ -108,6 +111,7 @@ def get_ai_updates():
         print("\nℹ️ No new articles found.")
         return []
 
+def get_fetched_ai_news():
+    existing_articles = load_existing_articles()
+    return existing_articles
 
-if __name__ == "__main__":
-    get_ai_updates()

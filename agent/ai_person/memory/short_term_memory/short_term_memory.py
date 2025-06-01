@@ -36,6 +36,7 @@ class ShortTermMemory:
         try:
             with open(self.storage_path, 'w') as f:
                 json.dump(list(self.conversation_buffer), f)
+                print("saved to converstation json")
         except IOError as e:
             print(f"Error saving conversation buffer: {e}")
 
@@ -58,5 +59,7 @@ class ShortTermMemory:
         """
         Returns the current conversation as a single string,
         with each dialogue on a new line.
+        Always loads the latest state from disk to ensure consistency.
         """
+        self._load_conversation_buffer()
         return "\n".join(self.conversation_buffer)

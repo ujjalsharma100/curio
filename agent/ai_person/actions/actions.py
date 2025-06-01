@@ -21,7 +21,7 @@ class Actions:
         ]
         
 
-    def execute_action(self, action_name: str, action_args: dict[str, Any]):
+    def execute_action(self, action_name: str, action_args: dict[str, Any]) -> None:
         """
         Execute an action by its name with the provided arguments.
 
@@ -36,6 +36,7 @@ class Actions:
             if action.name == action_name:
                 try:
                     action.execute(action_args)
+                    return None
                 except Exception as e:
                     print(f"Error executing action '{action_name}': {e}")
                     return None
