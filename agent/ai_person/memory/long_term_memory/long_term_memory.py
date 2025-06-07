@@ -1,13 +1,12 @@
+from .user_info import UserInfo
+
 class LongTermMemory:
 
     def __init__(self):
-        pass
-
+        self.user_info = UserInfo()
 
     def get_user_information_text(self) -> str:
-        return """
-        Name: Ujjal Sharma
-        Interests: AI, physics, sci fi movies
-        Job: Software Developer at Nutanix
-        Info: Ujjal is very honest, he is very ambitious and wants to contribute to humanity. He wants to create artificial conciousness.
-        """
+        return self.user_info.get_user_info_text()
+    
+    def update_user_information(self, field, value):
+        return self.user_info.update_user_info(field=field, value=value)

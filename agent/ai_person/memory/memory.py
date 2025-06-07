@@ -14,6 +14,9 @@ class Memory:
         The following are the details that you know about the human based on past interactions. 
         {user_info_text}
         """
+    
+    def update_user_info(self, field, value):
+        return self.long_term_memory.update_user_information(field=field, value=value)
 
     def get_current_conversation(self) -> str:
         return self.short_term_memory.get_current_conversation()
