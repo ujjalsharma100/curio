@@ -1,35 +1,58 @@
 from typing import Any
 from ..action import Action
-from .ai_news_fetcher import get_fetched_ai_news
 from ....memory import Memory
 from ....identity import Identity
 from ....purpose import Purpose
 from ....personality import Personality
 from ....llm_service import get_response_from_llm
 from .curio_chat_messenger import send_agent_message
+from .logging_setup import setup_action_logging
 import json
 
 class FetchNewsDetailsAction(Action):
     
     def __init__(self, description = "Get details and extra information regarding some update when the human wants it and send it to the human. This action searches the already fetched information previously and also sends/communicates the information to the human.", 
                 name = "fetch_news_details",
-                args = {}):
+                args = {
+                    "query": "The query to search with to get the relevant article"
+                }):
+        self.logger = setup_action_logging("fetch_news_details")
+        self.logger.info("Initializing FetchNewsDetailsAction")
         self.memory = Memory()
         self.identity = Identity()
         self.purpose = Purpose()
         self.personality = Personality()
         super().__init__(description, name, args)
+        self.logger.info("FetchNewsDetailsAction initialization complete")
 
     def execute(self, args: dict[str, Any]):
         try:
-            self.fetch_news_details()
+            self.logger.info("Starting fetch_news_details action execution")
+            query = args["query"]
+            self.logger.info(f"Query received: {query}")
+            self.fetch_news_details(query=query)
+            self.logger.info("fetch_news_details action execution completed successfully")
         except Exception as e:
+            self.logger.error(f"Error in fetch_news_details action execution: {str(e)}", exc_info=True)
             print(e)
     
-    def fetch_news_details(self):
-        fetched_ai_news = get_fetched_ai_news()
-        fetched_ai_news_string = json.dumps(fetched_ai_news)
+    def fetch_news_details(self, query: str):
+        self.logger.info(f"Starting news details search for query: {query}")
 
+        self.logger.debug("Searching for relevant news in memory")
+        fetched_ai_news = self.memory.search_relevant_news(query=query, top_k=1)
+        self.logger.info(f"Found {len(fetched_ai_news)} relevant news items")
+        
+        if fetched_ai_news:
+            for i, news_item in enumerate(fetched_ai_news):
+                self.logger.debug(f"News item {i+1}: {news_item.get('title', 'No title')} from {news_item.get('source', 'Unknown source')}")
+        else:
+            self.logger.warning("No relevant news items found for the query")
+            
+        fetched_ai_news_string = json.dumps(fetched_ai_news)
+        self.logger.debug(f"News items JSON string length: {len(fetched_ai_news_string)} characters")
+
+        self.logger.debug("Constructing prompt for LLM")
         prompt = f"""
         - Indentity:
         {self.identity.get_indentity_prompt()}
@@ -45,17 +68,26 @@ class FetchNewsDetailsAction(Action):
         {fetched_ai_news_string}
         - Expected Resonse
         Based on the current converstation, all the context and AI news information.
+        Understand the most recent want from human from the converstaion, not some previous ask. 
         You have the send a response to the human about what detail or answer the human was looking for.
         The AI news information contains a lot of details, some extra information, but you have to only inlclude the section, or news item that the human is looking for. 
         No need to include updates about other items. Understand what the human wants to know and include those things only.
         The response should the text you would be sending to the human.
         The responses should only be the text to be send to the human. Include nothing else.
         """
+        self.logger.debug(f"Prompt length: {len(prompt)} characters")
+        self.logger.info(f"Complete prompt for LLM:\n{prompt}")
 
+        self.logger.info("Calling LLM service for response generation")
         response_text = get_response_from_llm(prompt=prompt)
+        self.logger.info(f"Received response from LLM, length: {len(response_text)} characters")
+        self.logger.debug(f"LLM response: {response_text}")
+        
+        self.logger.info("Sending agent message to human")
         send_agent_message(response_text)
         agent_dialogue = f"You: {response_text}"
         self.memory.add_dialogue_to_current_converstaion(agent_dialogue)
+        self.logger.debug("Added agent dialogue to conversation memory")
 
-        print('ai')
+        self.logger.info("News details fetching and sending process completed")
     
