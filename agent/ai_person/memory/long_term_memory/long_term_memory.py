@@ -1,10 +1,12 @@
 from .user_info import UserInfo
 from .news_vector_db import NewsVectorDB
 from .news_db import NewsDB
+from .conversation_db import ConversationDB
 from typing import Dict, Any, Optional, List
 import logging
 import os
 from datetime import datetime
+import uuid
 
 # Setup logging for long term memory
 def setup_memory_logging():
@@ -51,6 +53,7 @@ class LongTermMemory:
         self.user_info = UserInfo()
         self.news_vector_db = NewsVectorDB()
         self.news_db = NewsDB()
+        self.conversation_db = ConversationDB()
         logger.info("LongTermMemory initialization complete")
 
     def get_user_information_text(self) -> str:
@@ -166,5 +169,69 @@ class LongTermMemory:
             logger.error(f"Error checking link existence in long-term memory: {str(e)}", exc_info=True)
             print(f"Error checking link existence in long-term memory: {str(e)}")
             return False
+    
+    def save_dialogue(self, dialogue: str) -> Optional[str]:
+        """Save a conversation dialogue to the conversation database.
+        
+        Args:
+            dialogue: The conversation dialogue text to save
+            
+        Returns:
+            Optional[str]: The ID of the saved conversation if successful, None otherwise
+        """
+        logger.info(f"Saving dialogue to conversation database")
+        logger.debug(f"Dialogue length: {len(dialogue)} characters")
+        try:
+            # Generate a unique conversation ID
+            conversation_id = str(uuid.uuid4())
+            logger.debug(f"Generated conversation_id: {conversation_id}")
+            
+            # Save to conversation database
+            if self.conversation_db.save_conversation(conversation_id, dialogue):
+                logger.info(f"Successfully saved dialogue with ID: {conversation_id}")
+                return conversation_id
+            else:
+                logger.error("Failed to save dialogue to conversation database")
+                return None
+        except Exception as e:
+            logger.error(f"Error saving dialogue: {str(e)}", exc_info=True)
+            print(f"Error saving dialogue: {str(e)}")
+            return None
+    
+    def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a conversation from the conversation database.
+        
+        Args:
+            conversation_id: ID of the conversation to retrieve
+            
+        Returns:
+            Optional[Dict[str, Any]]: Conversation data if found, None otherwise
+        """
+        logger.debug(f"Retrieving conversation with ID: {conversation_id}")
+        conversation = self.conversation_db.get_conversation(conversation_id)
+        if conversation:
+            logger.debug(f"Successfully retrieved conversation: {conversation_id}")
+        else:
+            logger.warning(f"No conversation found with ID: {conversation_id}")
+        return conversation
+    
+    def get_all_conversations(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Retrieve all conversations from the conversation database.
+        
+        Args:
+            limit: Optional limit on the number of conversations to return
+            
+        Returns:
+            List[Dict[str, Any]]: List of conversation data
+        """
+        logger.info(f"Retrieving all conversations, limit: {limit}")
+        try:
+            conversations = self.conversation_db.get_all_conversations(limit=limit)
+            logger.info(f"Retrieved {len(conversations)} conversations")
+            return conversations
+        except Exception as e:
+            logger.error(f"Error retrieving conversations: {str(e)}", exc_info=True)
+            print(f"Error retrieving conversations: {str(e)}")
+            return []
     
     

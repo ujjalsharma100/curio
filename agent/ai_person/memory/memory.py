@@ -1,6 +1,7 @@
 from .long_term_memory import LongTermMemory
 from .short_term_memory import ShortTermMemory
 from typing import Dict, Any, Optional, List
+from datetime import datetime
 
 class Memory:
 
@@ -20,7 +21,11 @@ class Memory:
         """
     
     def add_dialogue_to_current_converstaion(self, dialogue: str) -> str:
-        self.short_term_memory.add_to_conversation_buffer(dialogue)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dialogue_with_timestamp = f"[{timestamp}] {dialogue}"
+        self.short_term_memory.add_to_conversation_buffer(dialogue_with_timestamp)
+        self.long_term_memory.save_dialogue(dialogue_with_timestamp)
+        
 
     def save_news_item(self, news_item: Dict[str, Any]) -> Optional[str]:
         return self.long_term_memory.save_news_item(news_item)

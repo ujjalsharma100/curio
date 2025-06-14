@@ -1,5 +1,4 @@
 from collections import deque
-from datetime import datetime
 import json
 import os
 from typing import Optional
@@ -40,7 +39,7 @@ class ShortTermMemory:
         except IOError as e:
             print(f"Error saving conversation buffer: {e}")
 
-    def add_to_conversation_buffer(self, dialogue: str) -> None:
+    def add_to_conversation_buffer(self, dialogue_with_timestamp: str) -> None:
         """
         Add a dialogue to the conversation buffer and persist it.
         If the buffer is full, the oldest dialogue will be automatically removed.
@@ -48,8 +47,6 @@ class ShortTermMemory:
         Args:
             dialogue: The dialogue to add to the buffer
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        dialogue_with_timestamp = f"[{timestamp}] {dialogue}"
         self._load_conversation_buffer()
         self.conversation_buffer.append(dialogue_with_timestamp)
         self._save_conversation_buffer()
