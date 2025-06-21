@@ -28,13 +28,13 @@ def setup_logging():
     # Create file handler
     file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.DEBUG)
-    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - [%(agent_id)s] - %(message)s')
     file_handler.setFormatter(file_formatter)
     
     # Create console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+    console_formatter = logging.Formatter('%(levelname)s - [%(agent_id)s] - %(message)s')
     console_handler.setFormatter(console_formatter)
     
     # Add handlers to logger
@@ -59,11 +59,11 @@ class AiPerson:
 
     def hear_text(self, agent_id: str, text: str) -> None:
         try:
-            logger.info(f"Received text from human: {text}")
+            logger.info(f"Received text from human: {text}", extra={'agent_id': agent_id})
             print(text)
             user_dialouge = f"Human: {text}"
             self.memory.add_dialogue_to_current_converstaion(agent_id, user_dialouge)
-            logger.debug(f"Added dialogue to conversation: {user_dialouge}")
+            logger.debug(f"Added dialogue to conversation: {user_dialouge}", extra={'agent_id': agent_id})
 
 
             response_structure = {
@@ -120,42 +120,42 @@ class AiPerson:
             """
 
             response_from_llm = get_response_from_llm(prompt=prompt)
-            logger.info(f"Prompt to LLM {prompt}")
+            logger.info(f"Prompt to LLM {prompt}", extra={'agent_id': agent_id})
 
             response_json = json.loads(response_from_llm)
-            logger.debug(f"Parsed LLM response: {json.dumps(response_json, indent=2)}")
+            logger.debug(f"Parsed LLM response: {json.dumps(response_json, indent=2)}", extra={'agent_id': agent_id})
             print(response_json)
 
             actions = response_json.get('action', {})
             action_name = actions.get('action_name', 'default_action')
             action_args = actions.get('action_args', {})
-            logger.info(f"Executing action: {action_name} with args: {action_args}")
+            logger.info(f"Executing action: {action_name} with args: {action_args}", extra={'agent_id': agent_id})
             
             if details_about_human := response_json.get('details_about_human'):
-                logger.info(f"Updating human details: {details_about_human}")
+                logger.info(f"Updating human details: {details_about_human}", extra={'agent_id': agent_id})
                 for key, value in details_about_human.items():
                     self.memory.update_user_info(agent_id, field=key, value=value)
 
             if conversational_behavior := response_json.get('conversational_behavior'):
-                logger.info("Updating conversational behavior")
+                logger.info("Updating conversational behavior", extra={'agent_id': agent_id})
                 self.personality.update_conversational_behavior(agent_id, conversational_behavior)
 
             debug_info = response_json.get('debugInfo', None)
             if debug_info:
-                logger.debug(f"Debug info from LLM: {debug_info}")
+                logger.debug(f"Debug info from LLM: {debug_info}", extra={'agent_id': agent_id})
             print("debugInfo:\n")
             print(debug_info)
 
             self.actions.execute_action(agent_id=agent_id, action_name=action_name, action_args=action_args)
-            logger.info(f"Action {action_name} execution completed")
+            logger.info(f"Action {action_name} execution completed", extra={'agent_id': agent_id})
 
         except Exception as e:
-            logger.error(f"Error in hear_text: {str(e)}", exc_info=True)
+            logger.error(f"Error in hear_text: {str(e)}", exc_info=True, extra={'agent_id': agent_id})
             print(e)
 
     def initialize_agent(self, agent_id: str) -> None:
         """Initialize a new agent_id in all relevant submodules."""
-        logger.info(f"Initializing new agent_id: {agent_id}")
+        logger.info(f"Initializing new agent_id: {agent_id}", extra={'agent_id': agent_id})
         self.personality.initialize_personality(agent_id)
         self.memory.initialize_memory(agent_id)
-        logger.info(f"Initialization complete for agent_id: {agent_id}")
+        logger.info(f"Initialization complete for agent_id: {agent_id}", extra={'agent_id': agent_id})

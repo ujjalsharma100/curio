@@ -27,32 +27,32 @@ class FetchNewsDetailsAction(Action):
 
     def execute(self, agent_id: str, args: dict[str, Any]):
         try:
-            self.logger.info("Starting fetch_news_details action execution")
+            self.logger.info(f"Starting fetch_news_details action execution for agent_id: {agent_id}")
             query = args["query"]
-            self.logger.info(f"Query received: {query}")
+            self.logger.info(f"Query received for agent_id {agent_id}: {query}")
             self.fetch_news_details(query=query, agent_id=agent_id)
-            self.logger.info("fetch_news_details action execution completed successfully")
+            self.logger.info(f"fetch_news_details action execution completed successfully for agent_id: {agent_id}")
         except Exception as e:
-            self.logger.error(f"Error in fetch_news_details action execution: {str(e)}", exc_info=True)
+            self.logger.error(f"Error in fetch_news_details action execution for agent_id {agent_id}: {str(e)}", exc_info=True)
             print(e)
     
     def fetch_news_details(self, query: str, agent_id: str):
-        self.logger.info(f"Starting news details search for query: {query}")
+        self.logger.info(f"Starting news details search for query: {query} for agent_id: {agent_id}")
 
-        self.logger.debug("Searching for relevant news in memory")
+        self.logger.debug(f"Searching for relevant news in memory for agent_id: {agent_id}")
         fetched_ai_news = self.memory.search_relevant_news(agent_id=agent_id, query=query, top_k=1)
-        self.logger.info(f"Found {len(fetched_ai_news)} relevant news items")
+        self.logger.info(f"Found {len(fetched_ai_news)} relevant news items for agent_id: {agent_id}")
         
         if fetched_ai_news:
             for i, news_item in enumerate(fetched_ai_news):
-                self.logger.debug(f"News item {i+1}: {news_item.get('title', 'No title')} from {news_item.get('source', 'Unknown source')}")
+                self.logger.debug(f"News item {i+1} for agent_id {agent_id}: {news_item.get('title', 'No title')} from {news_item.get('source', 'Unknown source')}")
         else:
-            self.logger.warning("No relevant news items found for the query")
+            self.logger.warning(f"No relevant news items found for the query for agent_id: {agent_id}")
             
         fetched_ai_news_string = json.dumps(fetched_ai_news)
-        self.logger.debug(f"News items JSON string length: {len(fetched_ai_news_string)} characters")
+        self.logger.debug(f"News items JSON string length for agent_id {agent_id}: {len(fetched_ai_news_string)} characters")
 
-        self.logger.debug("Constructing prompt for LLM")
+        self.logger.debug(f"Constructing prompt for LLM for agent_id: {agent_id}")
         prompt = f"""
         - Indentity:
         {self.identity.get_indentity_prompt(agent_id) if hasattr(self.identity, 'get_indentity_prompt') and 'agent_id' in self.identity.get_indentity_prompt.__code__.co_varnames else self.identity.get_indentity_prompt()}
@@ -75,19 +75,19 @@ class FetchNewsDetailsAction(Action):
         The response should the text you would be sending to the human.
         The responses should only be the text to be send to the human. Include nothing else.
         """
-        self.logger.debug(f"Prompt length: {len(prompt)} characters")
-        self.logger.info(f"Complete prompt for LLM:\n{prompt}")
+        self.logger.debug(f"Prompt length for agent_id {agent_id}: {len(prompt)} characters")
+        self.logger.info(f"Complete prompt for LLM for agent_id {agent_id}:\n{prompt}")
 
-        self.logger.info("Calling LLM service for response generation")
+        self.logger.info(f"Calling LLM service for response generation for agent_id: {agent_id}")
         response_text = get_response_from_llm(prompt=prompt)
-        self.logger.info(f"Received response from LLM, length: {len(response_text)} characters")
-        self.logger.debug(f"LLM response: {response_text}")
+        self.logger.info(f"Received response from LLM for agent_id {agent_id}, length: {len(response_text)} characters")
+        self.logger.debug(f"LLM response for agent_id {agent_id}: {response_text}")
         
-        self.logger.info("Sending agent message to human")
+        self.logger.info(f"Sending agent message to human for agent_id: {agent_id}")
         send_agent_message(agent_id, response_text)
         agent_dialogue = f"You: {response_text}"
         self.memory.add_dialogue_to_current_converstaion(agent_id, agent_dialogue)
-        self.logger.debug("Added agent dialogue to conversation memory")
+        self.logger.debug(f"Added agent dialogue to conversation memory for agent_id: {agent_id}")
 
-        self.logger.info("News details fetching and sending process completed")
+        self.logger.info(f"News details fetching and sending process completed for agent_id: {agent_id}")
     
