@@ -56,17 +56,18 @@ class LongTermMemory:
         self.conversation_db = ConversationDB()
         logger.info("LongTermMemory initialization complete")
 
-    def get_user_information_text(self) -> str:
-        return self.user_info.get_user_info_text()
+    def get_user_information_text(self, agent_id: str) -> str:
+        return self.user_info.get_user_info_text(agent_id)
     
-    def update_user_information(self, field, value):
+    def update_user_information(self, agent_id: str, field, value):
         logger.debug(f"Updating user information: {field} = {value}")
-        return self.user_info.update_user_info(field=field, value=value)
+        return self.user_info.update_user_info(agent_id, field=field, value=value)
     
-    def save_news_item(self, news_item: Dict[str, Any]) -> Optional[str]:
+    def save_news_item(self, agent_id: str, news_item: Dict[str, Any]) -> Optional[str]:
         """Save a news item to both vector database and SQLite database.
         
         Args:
+            agent_id: ID of the agent
             news_item: Dictionary containing news item data with keys:
                       title, summary, content, link, source, published
         
@@ -94,10 +95,11 @@ class LongTermMemory:
             return None
         
     
-    def get_news_item(self, news_id: str) -> Optional[Dict[str, Any]]:
+    def get_news_item(self, agent_id: str, news_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve a news item from the SQLite database.
         
         Args:
+            agent_id: ID of the agent
             news_id: ID of the news item to retrieve
             
         Returns:
@@ -111,36 +113,31 @@ class LongTermMemory:
             logger.warning(f"No news item found with ID: {news_id}")
         return news_item
     
-    def search_relevant_news(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """Search for news items relevant to the query and return their full details.
-        
-        Args:
-            query: Search query string to find relevant news items
-            top_k: Number of most relevant results to return (default: 3)
-            
-        Returns:
-            List[Dict[str, Any]]: List of news items with their full details, ordered by relevance.
-                                 Each news item contains: news_id, title, summary, content, 
-                                 link, source, published_at, and created_at.
-        """
-        logger.info(f"Searching for relevant news with query: '{query}', top_k: {top_k}")
+    def search_relevant_news(self, agent_id: str, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """Search for news items relevant to the query and return their full details, filtered by agent_id."""
+        logger.info(f"Searching for relevant news with query: '{query}', top_k: {top_k}, agent_id: {agent_id}")
         try:
             # First get relevant news IDs from vector database
             logger.debug("Searching vector database for relevant news IDs")
             news_ids = self.news_vector_db.search_news(query, top_k=top_k)
             logger.debug(f"Found {len(news_ids)} relevant news IDs: {news_ids}")
-            
+
+            # Filter news_ids to only those processed by this agent
+            processed_news_ids = set(self.news_db.get_news_ids_processed_by_agent(agent_id))
+            news_ids = [nid for nid in news_ids if nid in processed_news_ids]
+            logger.debug(f"Filtered news_ids for agent_id {agent_id}: {news_ids}")
+
             # Then get full details for each news item from SQLite
             news_items = []
             for i, news_id in enumerate(news_ids):
                 logger.debug(f"Retrieving details for news item {i+1}/{len(news_ids)}: {news_id}")
-                news_item = self.get_news_item(news_id)
+                news_item = self.get_news_item(agent_id, news_id)
                 if news_item:
                     news_items.append(news_item)
                     logger.debug(f"Added news item to results: {news_item.get('title', 'No title')}")
                 else:
                     logger.warning(f"Could not retrieve details for news_id: {news_id}")
-            
+
             logger.info(f"Search completed, returning {len(news_items)} news items")
             return news_items
         except Exception as e:
@@ -148,32 +145,35 @@ class LongTermMemory:
             print(f"Error searching relevant news: {str(e)}")
             return []
     
-    def check_link_exists(self, link: str) -> bool:
+    def check_link_exists(self, agent_id: str, link: str) -> Optional[str]:
         """Check if a news link already exists in the long-term memory.
         
         Args:
+            agent_id: ID of the agent
             link: The URL link to check for existence
             
         Returns:
-            bool: True if the link exists in the database, False otherwise
+            Optional[str]: The news_id if the link exists in the database, None otherwise
         """
         logger.debug(f"Checking if link exists: {link}")
         try:
-            exists = self.news_db.link_exists(link)
-            if exists:
-                logger.debug(f"Link already exists in database: {link}")
+            news_id = self.news_db.link_exists(link)
+            if news_id:
+                logger.debug(f"Link already exists in database: {link}, news_id: {news_id}")
+                return news_id
             else:
                 logger.debug(f"Link does not exist in database: {link}")
-            return exists
+                return None
         except Exception as e:
             logger.error(f"Error checking link existence in long-term memory: {str(e)}", exc_info=True)
             print(f"Error checking link existence in long-term memory: {str(e)}")
-            return False
+            return None
     
-    def save_dialogue(self, dialogue: str) -> Optional[str]:
+    def save_dialogue(self, agent_id: str, dialogue: str) -> Optional[str]:
         """Save a conversation dialogue to the conversation database.
         
         Args:
+            agent_id: ID of the agent
             dialogue: The conversation dialogue text to save
             
         Returns:
@@ -187,7 +187,7 @@ class LongTermMemory:
             logger.debug(f"Generated conversation_id: {conversation_id}")
             
             # Save to conversation database
-            if self.conversation_db.save_conversation(conversation_id, dialogue):
+            if self.conversation_db.save_conversation(agent_id, conversation_id, dialogue):
                 logger.info(f"Successfully saved dialogue with ID: {conversation_id}")
                 return conversation_id
             else:
@@ -198,35 +198,37 @@ class LongTermMemory:
             print(f"Error saving dialogue: {str(e)}")
             return None
     
-    def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+    def get_conversation(self, agent_id: str, conversation_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve a conversation from the conversation database.
         
         Args:
+            agent_id: ID of the agent
             conversation_id: ID of the conversation to retrieve
             
         Returns:
             Optional[Dict[str, Any]]: Conversation data if found, None otherwise
         """
         logger.debug(f"Retrieving conversation with ID: {conversation_id}")
-        conversation = self.conversation_db.get_conversation(conversation_id)
+        conversation = self.conversation_db.get_conversation(agent_id, conversation_id)
         if conversation:
             logger.debug(f"Successfully retrieved conversation: {conversation_id}")
         else:
             logger.warning(f"No conversation found with ID: {conversation_id}")
         return conversation
     
-    def get_all_conversations(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_all_conversations(self, agent_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Retrieve all conversations from the conversation database.
         
         Args:
+            agent_id: ID of the agent
             limit: Optional limit on the number of conversations to return
             
         Returns:
             List[Dict[str, Any]]: List of conversation data
         """
-        logger.info(f"Retrieving all conversations, limit: {limit}")
+        logger.info(f"Retrieving all conversations for agent_id={agent_id}, limit: {limit}")
         try:
-            conversations = self.conversation_db.get_all_conversations(limit=limit)
+            conversations = self.conversation_db.get_all_conversations(agent_id, limit=limit)
             logger.info(f"Retrieved {len(conversations)} conversations")
             return conversations
         except Exception as e:

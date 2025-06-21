@@ -21,11 +21,12 @@ class Actions:
         ]
         
 
-    def execute_action(self, action_name: str, action_args: dict[str, Any]) -> None:
+    def execute_action(self, agent_id: str, action_name: str, action_args: dict[str, Any]) -> None:
         """
         Execute an action by its name with the provided arguments.
 
         Args:
+            agent_id (str): The ID of the agent executing the action.
             action_name (str): The name of the action to execute.
             action_args (dict[str, Any]): Arguments to pass to the action.
 
@@ -35,7 +36,7 @@ class Actions:
         for action in self.available_actions:
             if action.name == action_name:
                 try:
-                    action.execute(action_args)
+                    action.execute(agent_id, action_args)
                     return None
                 except Exception as e:
                     print(f"Error executing action '{action_name}': {e}")

@@ -1,62 +1,51 @@
 from collections import deque
-import json
-import os
 from typing import Optional
+from .short_term_memory_db import ShortTermMemoryDB
 
 class ShortTermMemory:
-    
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, maxlen: int = 20, db_path: Optional[str] = None):
         """
-        Initialize the short term memory with optional persistence.
-
+        Initialize the short term memory with agent_id-based segmentation using SQLite.
         Args:
-            storage_path: Path to the JSON file where conversations will be stored.
-                          If None, defaults to 'conversation_buffer.json' in the same directory as this file.
+            maxlen: Maximum length of the conversation buffer (default 20).
+            db_path: Optional path to the SQLite DB file.
         """
-        if storage_path is None:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            storage_path = os.path.join(current_dir, "conversation_buffer.json")
-        self.storage_path = storage_path
-        self.conversation_buffer = deque(maxlen=20)
-        self._load_conversation_buffer()
+        self.maxlen = maxlen
+        self.db = ShortTermMemoryDB(db_path)
 
-    def _load_conversation_buffer(self) -> None:
-        """Load the conversation buffer from the JSON file if it exists."""
-        if os.path.exists(self.storage_path):
-            try:
-                with open(self.storage_path, 'r') as f:
-                    saved_buffer = json.load(f)
-                    self.conversation_buffer = deque(saved_buffer, maxlen=20)
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading conversation buffer: {e}")
+    def _load_conversation_buffer(self, agent_id: str) -> deque:
+        """Load the conversation buffer for the given agent_id from the DB."""
+        buffer = self.db.get_buffer(agent_id)
+        return deque(buffer, maxlen=self.maxlen)
 
-    def _save_conversation_buffer(self) -> None:
-        """Save the current conversation buffer to the JSON file."""
-        try:
-            with open(self.storage_path, 'w') as f:
-                json.dump(list(self.conversation_buffer), f)
-                print("saved to converstation json")
-        except IOError as e:
-            print(f"Error saving conversation buffer: {e}")
+    def _save_conversation_buffer(self, agent_id: str, buffer: deque) -> None:
+        """Save the conversation buffer for the given agent_id to the DB."""
+        self.db.set_buffer(agent_id, list(buffer))
 
-    def add_to_conversation_buffer(self, dialogue_with_timestamp: str) -> None:
+    def add_to_conversation_buffer(self, agent_id: str, dialogue_with_timestamp: str) -> None:
         """
-        Add a dialogue to the conversation buffer and persist it.
+        Add a dialogue to the conversation buffer for the given agent_id and persist it.
         If the buffer is full, the oldest dialogue will be automatically removed.
-        
         Args:
-            dialogue: The dialogue to add to the buffer
+            agent_id: The agent's unique identifier.
+            dialogue_with_timestamp: The dialogue to add to the buffer.
         """
-        self._load_conversation_buffer()
-        self.conversation_buffer.append(dialogue_with_timestamp)
-        self._save_conversation_buffer()
-        self._load_conversation_buffer()
+        buffer = self._load_conversation_buffer(agent_id)
+        buffer.append(dialogue_with_timestamp)
+        self._save_conversation_buffer(agent_id, buffer)
 
-    def get_current_conversation(self) -> str:
+    def get_current_conversation(self, agent_id: str) -> str:
         """
-        Returns the current conversation as a single string,
+        Returns the current conversation for the given agent_id as a single string,
         with each dialogue on a new line.
-        Always loads the latest state from disk to ensure consistency.
+        Always loads the latest state from the DB to ensure consistency.
+        Args:
+            agent_id: The agent's unique identifier.
         """
-        self._load_conversation_buffer()
-        return "\n".join(self.conversation_buffer)
+        buffer = self._load_conversation_buffer(agent_id)
+        return "\n".join(buffer)
+
+    def initialize_short_term_memory(self, agent_id: str) -> None:
+        """Initialize the short term memory buffer for a new agent_id (empty buffer)."""
+        if not self.db.get_buffer(agent_id):
+            self.db.set_buffer(agent_id, [])

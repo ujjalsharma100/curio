@@ -1,6 +1,11 @@
 import requests
+import os
+from dotenv import load_dotenv
 
-def send_agent_message(agent_message):
+# Load environment variables from .env file
+load_dotenv()
+
+def send_agent_message(agent_id, agent_message):
     """
     Send a message from the agent back to the main application.
     
@@ -12,7 +17,6 @@ def send_agent_message(agent_message):
     endpoint for display to the user.
     """
     try:
-        agent_id = get_agent_id()
         curio_app_url = get_curio_app_url()
         payload = {
             "agent_id": agent_id,
@@ -23,22 +27,13 @@ def send_agent_message(agent_message):
         print(f"Error sending agent message: {e}")
 
 
-def get_agent_id():
-    """
-    Get the unique identifier for this agent instance.
-    
-    Returns:
-        int: The agent's unique identifier (currently hardcoded to 123)
-    """
-    return 123
-
-
 def get_curio_app_url():
     """
     Get the URL endpoint for the main Curio application.
     
     Returns:
         str: The URL where agent messages should be sent
-              (currently set to localhost:8086)
     """
-    return "http://localhost:8086/route_agent_message"
+    base_url = os.getenv("CURIO_APP_BASE_URL", "http://localhost:8086")
+    endpoint = os.getenv("CURIO_APP_ENDPOINT", "/route_agent_message")
+    return f"{base_url}{endpoint}"

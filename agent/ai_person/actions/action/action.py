@@ -10,8 +10,8 @@ class Action(ABC):
         self.args = args
     
     @abstractmethod
-    def execute(self, args: dict[str, Any]):
-        """Execute the action and return the result."""
+    def execute(self, agent_id: str, args: dict[str, Any]):
+        """Execute the action for a given agent and return the result."""
         pass
     
 

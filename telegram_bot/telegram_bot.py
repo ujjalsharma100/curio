@@ -2,7 +2,12 @@ import logging
 from telegram import Update, User
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 import requests
+from telegram_user_db import TelegramUserDB
+import os
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
 # Enable logging
 logging.basicConfig(
@@ -11,12 +16,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Telegram bot token
-BOT_TOKEN = "7477796128:AAE7BjPgmC2z3jDnfNmDjDENks8jh7Zowvw"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# telegram user ids for subscribers
-TELEGRAM_SUBSCRIBER_USER_IDS = [7962940109]
+# Admin bot token
+ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")
 
-BACKEND_URL = "http://localhost:8453"
+# Admin telegram ID - PLACEHOLDER - replace with actual admin telegram ID
+ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "123456789"))
+
+# Constants that don't change
+TELEGRAM_API_BASE_URL = "https://api.telegram.org"
+
+# Initialize the Telegram user DB
+telegram_user_db = TelegramUserDB()
+
 
 
 def print_user_details(update: Update) -> None:
@@ -36,29 +49,75 @@ def print_user_details(update: Update) -> None:
     print("===================\n")
 
 def get_curio_application_route_endpoint():
-    return "http://localhost:8086/route_telegram_user_message"
+    base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+    route = os.getenv("CURIO_ROUTE_TELEGRAM_MESSAGE", "/route_telegram_user_message")
+    return f"{base_url}{route}"
 
 def is_user_authorized(user: User) -> bool:
-    return user.id in TELEGRAM_SUBSCRIBER_USER_IDS
+    return telegram_user_db.user_exists(user.id)
+
+
+async def send_unregistered_user_notification_to_admin(update: Update) -> None:
+    """Send notification to admin bot when an unregistered user tries to use Curio."""
+    user = update.effective_user
+    chat = update.effective_chat
+    
+    # Format user details for admin notification
+    user_details = f"""
+🚨 **Unregistered User Alert**
+
+A user tried to use Curio but isn't registered yet.
+
+**User Details:**
+• User ID: `{user.id}`
+• Username: @{user.username}
+• First Name: {user.first_name}
+• Last Name: {user.last_name}
+• Language Code: {user.language_code}
+• Is Bot: {user.is_bot}
+• Chat Type: {chat.type}
+• Chat ID: {chat.id}
+
+**Action Required:** Register this user using `/register {user.id}`
+"""
+    
+    # Send message to admin bot
+    admin_bot_url = f"{TELEGRAM_API_BASE_URL}/bot{ADMIN_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": ADMIN_TELEGRAM_ID,
+        "text": user_details,
+        "parse_mode": "Markdown"
+    }
+    
+    try:
+        response = requests.post(admin_bot_url, json=payload)
+        if response.status_code != 200:
+            logger.error(f"Failed to send admin notification: {response.status_code} - {response.text}")
+    except Exception as e:
+        logger.error(f"Error sending admin notification: {str(e)}")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a welcome message when the /start command is issued."""
     print_user_details(update)
     welcome_text = """
-    Welcome! I’m Kevin.
-It’s no secret—AI is transforming the world at an unprecedented pace. Every day brings breakthroughs, new tools, and evolving ideas. But with so much happening, it’s easy to feel overwhelmed or miss what truly matters to you.
+    Welcome! I'm Curio.
+AI is changing everything—and fast. From breakthrough research to powerful tools, the pace of progress is unlike anything we've seen before. But with so much happening, it's easy to feel lost in the noise. What matters most isn't just staying updated—it's staying relevant.
 
-Whether you're a designer, engineer, or in management, staying informed is essential to stay ahead. But not all information is useful to everyone—and that’s where I come in.
+That's where I come in. I'm not just another information feed. I'm designed to understand you—your interests, your goals, your domain—and bring you the AI insights that matter most to you.
 
-I’m here to deliver AI updates and insights tailored to your interests. The more you share with me, the better I can serve you.
+Whether you're a designer, engineer, founder, or in management, you need to stay ahead. AI isn't just about automation—it's about amplifying your productivity, sharpening your edge, and expanding how you think and work.
 
-So, tell me a bit about yourself—and let’s get started.
+The more you share, the more precise and valuable I become. I'm here to help you cut through the noise, focus on what's truly useful, and stay one step ahead in a world that doesn't slow down.
+
+Introduce yourself—and let's get started.
     """
     await update.message.reply_text(welcome_text)
     user = update.effective_user
-    if user.id not in TELEGRAM_SUBSCRIBER_USER_IDS:
+    if not is_user_authorized(user):
         await update.message.reply_text("Sorry, I am not allowed to help your right now 😔... You have to ask my admin to register you and then I can help you ☺️")
+        # Send notification to admin
+        await send_unregistered_user_notification_to_admin(update)
 
 
 
@@ -76,6 +135,8 @@ async def route_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         requests.post(curio_application_route_endpint_url, json=payload)
     else:
         await update.message.reply_text("Sorry, I am not allowed to help your right now 😔... You have to ask my admin to register you and then I can help you ☺️")
+        # Send notification to admin
+        await send_unregistered_user_notification_to_admin(update)
     
 
 def main() -> None:

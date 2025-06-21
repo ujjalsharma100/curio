@@ -1,9 +1,14 @@
 from anthropic import Anthropic
 import ollama
+import os
+from dotenv import load_dotenv
 
-client = Anthropic(api_key="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")
+# Load environment variables from .env file
+load_dotenv()
 
-llm_choice = 'anthropic'
+# Get API key and LLM choice from environment variables
+client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+llm_choice = os.getenv("LLM_CHOICE", "anthropic")
 
 def get_response_from_llm(prompt: str) -> str:
     if llm_choice == 'anthropic':

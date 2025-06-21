@@ -76,6 +76,16 @@ class NewsDB:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
+                # New table for agent-news mapping
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS agent_news_processed (
+                        agent_id TEXT NOT NULL,
+                        news_id TEXT NOT NULL,
+                        processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (agent_id, news_id),
+                        FOREIGN KEY (news_id) REFERENCES news_items(news_id)
+                    )
+                ''')
                 conn.commit()
                 logger.debug("Database tables created/verified successfully")
         except Exception as e:
@@ -159,32 +169,83 @@ class NewsDB:
             print(f"Error retrieving news item: {str(e)}")
             return None
 
-    def link_exists(self, link: str) -> bool:
+    def link_exists(self, link: str) -> Optional[str]:
         """Check if a news link already exists in the database.
         
         Args:
             link: The URL link to check for existence
             
         Returns:
-            bool: True if the link exists in the database, False otherwise
+            Optional[str]: The news_id if the link exists in the database, None otherwise
         """
         logger.debug(f"Checking if link exists in SQLite database: {link}")
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT COUNT(*)
+                    SELECT news_id
                     FROM news_items
                     WHERE link = ?
                 ''', (link,))
-                count = cursor.fetchone()[0]
-                exists = count > 0
-                if exists:
-                    logger.debug(f"Link already exists in SQLite database: {link}")
+                row = cursor.fetchone()
+                if row:
+                    logger.debug(f"Link already exists in SQLite database: {link}, news_id: {row[0]}")
+                    return row[0]
                 else:
                     logger.debug(f"Link does not exist in SQLite database: {link}")
-                return exists
+                    return None
         except Exception as e:
             logger.error(f"Error checking link existence in SQLite: {str(e)}", exc_info=True)
             print(f"Error checking link existence: {str(e)}")
-            return False 
+            return None
+
+    def mark_news_processed_by_agent(self, agent_id: str, news_id: str) -> bool:
+        """Mark a news item as processed by a specific agent."""
+        logger.info(f"Marking news_id {news_id} as processed by agent_id {agent_id}")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR IGNORE INTO agent_news_processed (agent_id, news_id)
+                    VALUES (?, ?)
+                ''', (agent_id, news_id))
+                conn.commit()
+                logger.debug(f"Marked news_id {news_id} as processed by agent_id {agent_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error marking news as processed: {str(e)}", exc_info=True)
+            return False
+
+    def has_agent_processed_news(self, agent_id: str, news_id: str) -> bool:
+        """Check if a specific agent has processed a news item."""
+        logger.debug(f"Checking if agent_id {agent_id} has processed news_id {news_id}")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT 1 FROM agent_news_processed
+                    WHERE agent_id = ? AND news_id = ?
+                    LIMIT 1
+                ''', (agent_id, news_id))
+                result = cursor.fetchone()
+                return result is not None
+        except Exception as e:
+            logger.error(f"Error checking if agent processed news: {str(e)}", exc_info=True)
+            return False
+
+    def get_news_ids_processed_by_agent(self, agent_id: str) -> list:
+        """Return a list of news_ids processed by the given agent_id."""
+        logger.debug(f"Getting news_ids processed by agent_id: {agent_id}")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT news_id FROM agent_news_processed WHERE agent_id = ?
+                ''', (agent_id,))
+                rows = cursor.fetchall()
+                news_ids = [row[0] for row in rows]
+                logger.debug(f"Found {len(news_ids)} news_ids processed by agent_id {agent_id}")
+                return news_ids
+        except Exception as e:
+            logger.error(f"Error getting news_ids processed by agent: {str(e)}", exc_info=True)
+            return [] 

@@ -66,7 +66,8 @@ class ConversationDB:
                 cursor = conn.cursor()
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS conversations (
-                        conversation_id TEXT PRIMARY KEY,
+                        dialogue_id TEXT PRIMARY KEY,
+                        agent_id TEXT NOT NULL,
                         dialogue TEXT NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
@@ -77,138 +78,146 @@ class ConversationDB:
             logger.error(f"Error creating database tables: {str(e)}", exc_info=True)
             raise
     
-    def save_conversation(self, conversation_id: str, dialogue: str) -> bool:
-        """Save a conversation dialogue to the SQLite database.
+    def save_conversation(self, agent_id: str, dialogue_id: str, dialogue: str) -> bool:
+        """Save a conversation dialogue to the SQLite database for a specific agent.
         
         Args:
-            conversation_id: Unique identifier for the conversation
+            agent_id: Unique identifier for the agent
+            dialogue_id: Unique identifier for the dialogue
             dialogue: The conversation dialogue text
             
         Returns:
             bool: True if save was successful, False otherwise
         """
-        logger.info(f"Saving conversation to SQLite database with ID: {conversation_id}")
+        logger.info(f"Saving conversation to SQLite database with agent_id: {agent_id}, dialogue_id: {dialogue_id}")
         logger.debug(f"Dialogue length: {len(dialogue)} characters")
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO conversations 
-                    (conversation_id, dialogue)
-                    VALUES (?, ?)
-                ''', (conversation_id, dialogue))
+                    (dialogue_id, agent_id, dialogue)
+                    VALUES (?, ?, ?)
+                ''', (dialogue_id, agent_id, dialogue))
                 conn.commit()
-                logger.info(f"Successfully saved conversation to SQLite database: {conversation_id}")
+                logger.info(f"Successfully saved conversation to SQLite database: {dialogue_id} for agent {agent_id}")
                 return True
         except Exception as e:
             logger.error(f"Error saving conversation to SQLite: {str(e)}", exc_info=True)
             print(f"Error saving conversation to SQLite: {str(e)}")
             return False
     
-    def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a conversation from the database.
+    def get_conversation(self, agent_id: str, dialogue_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a conversation for a specific agent from the database.
         
         Args:
-            conversation_id: ID of the conversation to retrieve
+            agent_id: ID of the agent
+            dialogue_id: ID of the dialogue to retrieve
             
         Returns:
             Optional[Dict[str, Any]]: Conversation data if found, None otherwise
         """
-        logger.debug(f"Retrieving conversation from SQLite database: {conversation_id}")
+        logger.debug(f"Retrieving conversation from SQLite database: agent_id={agent_id}, dialogue_id={dialogue_id}")
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT conversation_id, dialogue, created_at
+                    SELECT dialogue_id, agent_id, dialogue, created_at
                     FROM conversations
-                    WHERE conversation_id = ?
-                ''', (conversation_id,))
+                    WHERE agent_id = ? AND dialogue_id = ?
+                ''', (agent_id, dialogue_id))
                 row = cursor.fetchone()
                 
                 if row:
                     conversation = {
-                        'conversation_id': row[0],
-                        'dialogue': row[1],
-                        'created_at': row[2]
+                        'dialogue_id': row[0],
+                        'agent_id': row[1],
+                        'dialogue': row[2],
+                        'created_at': row[3]
                     }
-                    logger.debug(f"Successfully retrieved conversation: {conversation_id}")
+                    logger.debug(f"Successfully retrieved conversation: {dialogue_id} for agent {agent_id}")
                     return conversation
                 else:
-                    logger.warning(f"No conversation found with ID: {conversation_id}")
+                    logger.warning(f"No conversation found with agent_id={agent_id}, dialogue_id={dialogue_id}")
                     return None
         except Exception as e:
             logger.error(f"Error retrieving conversation from SQLite: {str(e)}", exc_info=True)
             print(f"Error retrieving conversation: {str(e)}")
             return None
     
-    def get_all_conversations(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Retrieve all conversations from the database, ordered by creation time.
+    def get_all_conversations(self, agent_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Retrieve all conversations for a specific agent from the database, ordered by creation time.
         
         Args:
+            agent_id: ID of the agent
             limit: Optional limit on the number of conversations to return
             
         Returns:
             List[Dict[str, Any]]: List of conversation data
         """
-        logger.debug(f"Retrieving all conversations from SQLite database, limit: {limit}")
+        logger.debug(f"Retrieving all conversations from SQLite database for agent_id={agent_id}, limit: {limit}")
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 if limit:
                     cursor.execute('''
-                        SELECT conversation_id, dialogue, created_at
+                        SELECT dialogue_id, agent_id, dialogue, created_at
                         FROM conversations
+                        WHERE agent_id = ?
                         ORDER BY created_at DESC
                         LIMIT ?
-                    ''', (limit,))
+                    ''', (agent_id, limit))
                 else:
                     cursor.execute('''
-                        SELECT conversation_id, dialogue, created_at
+                        SELECT dialogue_id, agent_id, dialogue, created_at
                         FROM conversations
+                        WHERE agent_id = ?
                         ORDER BY created_at DESC
-                    ''')
+                    ''', (agent_id,))
                 
                 rows = cursor.fetchall()
                 conversations = []
                 for row in rows:
                     conversation = {
-                        'conversation_id': row[0],
-                        'dialogue': row[1],
-                        'created_at': row[2]
+                        'dialogue_id': row[0],
+                        'agent_id': row[1],
+                        'dialogue': row[2],
+                        'created_at': row[3]
                     }
                     conversations.append(conversation)
                 
-                logger.debug(f"Successfully retrieved {len(conversations)} conversations")
+                logger.debug(f"Successfully retrieved {len(conversations)} conversations for agent_id={agent_id}")
                 return conversations
         except Exception as e:
             logger.error(f"Error retrieving conversations from SQLite: {str(e)}", exc_info=True)
             print(f"Error retrieving conversations: {str(e)}")
             return []
     
-    def delete_conversation(self, conversation_id: str) -> bool:
-        """Delete a conversation from the database.
+    def delete_conversation(self, agent_id: str, dialogue_id: str) -> bool:
+        """Delete a conversation for a specific agent from the database.
         
         Args:
-            conversation_id: ID of the conversation to delete
+            agent_id: ID of the agent
+            dialogue_id: ID of the dialogue to delete
             
         Returns:
             bool: True if deletion was successful, False otherwise
         """
-        logger.info(f"Deleting conversation from SQLite database: {conversation_id}")
+        logger.info(f"Deleting conversation from SQLite database: agent_id={agent_id}, dialogue_id={dialogue_id}")
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
                     DELETE FROM conversations
-                    WHERE conversation_id = ?
-                ''', (conversation_id,))
+                    WHERE agent_id = ? AND dialogue_id = ?
+                ''', (agent_id, dialogue_id))
                 conn.commit()
                 
                 if cursor.rowcount > 0:
-                    logger.info(f"Successfully deleted conversation: {conversation_id}")
+                    logger.info(f"Successfully deleted conversation: {dialogue_id} for agent {agent_id}")
                     return True
                 else:
-                    logger.warning(f"No conversation found to delete with ID: {conversation_id}")
+                    logger.warning(f"No conversation found to delete with agent_id={agent_id}, dialogue_id={dialogue_id}")
                     return False
         except Exception as e:
             logger.error(f"Error deleting conversation from SQLite: {str(e)}", exc_info=True)

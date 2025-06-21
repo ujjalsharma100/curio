@@ -57,12 +57,12 @@ class AiPerson:
         logger.info("AiPerson initialization complete")
     
 
-    def hear_text(self, text: str) -> None:
+    def hear_text(self, agent_id: str, text: str) -> None:
         try:
             logger.info(f"Received text from human: {text}")
             print(text)
             user_dialouge = f"Human: {text}"
-            self.memory.add_dialogue_to_current_converstaion(user_dialouge)
+            self.memory.add_dialogue_to_current_converstaion(agent_id, user_dialouge)
             logger.debug(f"Added dialogue to conversation: {user_dialouge}")
 
 
@@ -84,17 +84,17 @@ class AiPerson:
 
             prompt = f"""
             - Indentity:
-            {self.identity.get_indentity_prompt()}
+            {self.identity.get_indentity_prompt(agent_id) if hasattr(self.identity, 'get_indentity_prompt') and 'agent_id' in self.identity.get_indentity_prompt.__code__.co_varnames else self.identity.get_indentity_prompt()}
             - Purpose:
-            {self.purpose.get_purpose_prompt()}
+            {self.purpose.get_purpose_prompt(agent_id) if hasattr(self.purpose, 'get_purpose_prompt') and 'agent_id' in self.purpose.get_purpose_prompt.__code__.co_varnames else self.purpose.get_purpose_prompt()}
             - Personality:
-            {self.personality.get_personality_prompt_text()}
+            {self.personality.get_personality_prompt_text(agent_id)}
             - Details about Human:
-            {self.memory.get_information_about_the_human_prompt()}
+            {self.memory.get_information_about_the_human_prompt(agent_id)}
             - Available Actions:
             {self.actions.get_all_available_actions_prompt()}
             - Current Conversation:
-            {self.memory.get_current_conversation_prompt()}
+            {self.memory.get_current_conversation_prompt(agent_id)}
             - Expected Resonse:
             Base on the current converstaion, respond what should be the next action from the available actions.
             Analyze and Understand the most recent ask/want from human from the converstaion, not some previous ask.
@@ -134,11 +134,11 @@ class AiPerson:
             if details_about_human := response_json.get('details_about_human'):
                 logger.info(f"Updating human details: {details_about_human}")
                 for key, value in details_about_human.items():
-                    self.memory.update_user_info(field=key, value=value)
+                    self.memory.update_user_info(agent_id, field=key, value=value)
 
             if conversational_behavior := response_json.get('conversational_behavior'):
                 logger.info("Updating conversational behavior")
-                self.personality.update_conversational_behavior(conversational_behavior)
+                self.personality.update_conversational_behavior(agent_id, conversational_behavior)
 
             debug_info = response_json.get('debugInfo', None)
             if debug_info:
@@ -146,9 +146,16 @@ class AiPerson:
             print("debugInfo:\n")
             print(debug_info)
 
-            self.actions.execute_action(action_name=action_name, action_args=action_args)
+            self.actions.execute_action(agent_id=agent_id, action_name=action_name, action_args=action_args)
             logger.info(f"Action {action_name} execution completed")
 
         except Exception as e:
             logger.error(f"Error in hear_text: {str(e)}", exc_info=True)
             print(e)
+
+    def initialize_agent(self, agent_id: str) -> None:
+        """Initialize a new agent_id in all relevant submodules."""
+        logger.info(f"Initializing new agent_id: {agent_id}")
+        self.personality.initialize_personality(agent_id)
+        self.memory.initialize_memory(agent_id)
+        logger.info(f"Initialization complete for agent_id: {agent_id}")

@@ -25,22 +25,22 @@ class FetchNewsDetailsAction(Action):
         super().__init__(description, name, args)
         self.logger.info("FetchNewsDetailsAction initialization complete")
 
-    def execute(self, args: dict[str, Any]):
+    def execute(self, agent_id: str, args: dict[str, Any]):
         try:
             self.logger.info("Starting fetch_news_details action execution")
             query = args["query"]
             self.logger.info(f"Query received: {query}")
-            self.fetch_news_details(query=query)
+            self.fetch_news_details(query=query, agent_id=agent_id)
             self.logger.info("fetch_news_details action execution completed successfully")
         except Exception as e:
             self.logger.error(f"Error in fetch_news_details action execution: {str(e)}", exc_info=True)
             print(e)
     
-    def fetch_news_details(self, query: str):
+    def fetch_news_details(self, query: str, agent_id: str):
         self.logger.info(f"Starting news details search for query: {query}")
 
         self.logger.debug("Searching for relevant news in memory")
-        fetched_ai_news = self.memory.search_relevant_news(query=query, top_k=1)
+        fetched_ai_news = self.memory.search_relevant_news(agent_id=agent_id, query=query, top_k=1)
         self.logger.info(f"Found {len(fetched_ai_news)} relevant news items")
         
         if fetched_ai_news:
@@ -55,15 +55,15 @@ class FetchNewsDetailsAction(Action):
         self.logger.debug("Constructing prompt for LLM")
         prompt = f"""
         - Indentity:
-        {self.identity.get_indentity_prompt()}
+        {self.identity.get_indentity_prompt(agent_id) if hasattr(self.identity, 'get_indentity_prompt') and 'agent_id' in self.identity.get_indentity_prompt.__code__.co_varnames else self.identity.get_indentity_prompt()}
         - Purpose:
-        {self.purpose.get_purpose_prompt()}
+        {self.purpose.get_purpose_prompt(agent_id) if hasattr(self.purpose, 'get_purpose_prompt') and 'agent_id' in self.purpose.get_purpose_prompt.__code__.co_varnames else self.purpose.get_purpose_prompt()}
         - Personality:
-        {self.personality.get_personality_prompt_text()}
+        {self.personality.get_personality_prompt_text(agent_id)}
         - Details about Human:
-        {self.memory.get_information_about_the_human_prompt()}
+        {self.memory.get_information_about_the_human_prompt(agent_id)}
         - Current Converstaion:
-        {self.memory.get_current_conversation_prompt()}
+        {self.memory.get_current_conversation_prompt(agent_id)}
         - AI news information:
         {fetched_ai_news_string}
         - Expected Resonse
@@ -84,9 +84,9 @@ class FetchNewsDetailsAction(Action):
         self.logger.debug(f"LLM response: {response_text}")
         
         self.logger.info("Sending agent message to human")
-        send_agent_message(response_text)
+        send_agent_message(agent_id, response_text)
         agent_dialogue = f"You: {response_text}"
-        self.memory.add_dialogue_to_current_converstaion(agent_dialogue)
+        self.memory.add_dialogue_to_current_converstaion(agent_id, agent_dialogue)
         self.logger.debug("Added agent dialogue to conversation memory")
 
         self.logger.info("News details fetching and sending process completed")

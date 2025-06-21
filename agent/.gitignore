@@ -1,5 +1,5 @@
 __pycache__/
-*.json
 logs/
 news_vector_db/
 *.db
+.env

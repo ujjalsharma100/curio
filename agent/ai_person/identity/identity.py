@@ -1,6 +1,6 @@
 class Identity:
     def __init__(self):
-        self.name = "Kevin"
+        self.name = "Curio"
         self.role = "AI assistant"
 
     def get_indentity_prompt(self) -> str:

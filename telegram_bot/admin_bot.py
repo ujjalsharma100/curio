@@ -1,0 +1,190 @@
+import logging
+from telegram import Update, User
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+import requests
+from telegram_user_db import TelegramUserDB
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Enable logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Admin bot token - PLACEHOLDER - replace with actual token
+ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")
+
+# Admin telegram ID - PLACEHOLDER - replace with actual admin telegram ID
+ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "123456789"))
+
+# Initialize the Telegram user DB
+telegram_user_db = TelegramUserDB()
+
+
+def is_admin_authorized(user: User) -> bool:
+    """Check if the user is authorized to use admin commands."""
+    return user.id == ADMIN_TELEGRAM_ID
+
+
+def print_user_details(update: Update) -> None:
+    """Print detailed information about the user."""
+    user = update.effective_user
+    chat = update.effective_chat
+    
+    print("\n=== Admin User Details ===")
+    print(f"User ID: {user.id}")
+    print(f"Username: @{user.username}")
+    print(f"First Name: {user.first_name}")
+    print(f"Last Name: {user.last_name}")
+    print(f"Language Code: {user.language_code}")
+    print(f"Is Bot: {user.is_bot}")
+    print(f"Chat Type: {chat.type}")
+    print(f"Chat ID: {chat.id}")
+    print(f"Is Admin Authorized: {is_admin_authorized(user)}")
+    print("==========================\n")
+
+
+def get_curio_initialize_user_endpoint():
+    base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+    route = os.getenv("CURIO_ROUTE_INITIALIZE_USER", "/add_and_initialize_user")
+    return f"{base_url}{route}"
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sends a welcome message when the /start command is issued."""
+    print_user_details(update)
+    user = update.effective_user
+    
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    
+    welcome_text = """
+    Welcome to Curio Admin Bot! 🤖
+
+I'm here to help you manage user registrations for the Curio AI assistant.
+
+Available commands:
+/register <telegram_id> - Register a new user with the given telegram ID
+/list_users - List all registered users
+/help - Show this help message
+
+Example: /register 123456789
+    """
+    await update.message.reply_text(welcome_text)
+
+
+async def register_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Register a new user with the given telegram ID."""
+    print_user_details(update)
+    user = update.effective_user
+    
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    
+    if not context.args:
+        await update.message.reply_text("❌ Please provide a telegram ID.\nUsage: /register <telegram_id>")
+        return
+    
+    try:
+        telegram_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Invalid telegram ID. Please provide a valid number.")
+        return
+    
+    # Check if user already exists
+    if telegram_user_db.user_exists(telegram_id):
+        await update.message.reply_text(f"⚠️ User with telegram ID {telegram_id} is already registered.")
+        return
+    
+    try:
+        # Call curio application to initialize new user
+        curio_endpoint = get_curio_initialize_user_endpoint()
+        payload = {
+            "telegram_id": telegram_id,
+            "admin_telegram_id": user.id
+        }
+        
+        response = requests.post(curio_endpoint, json=payload)
+        
+        if response.status_code == 200:
+            # Add user to local database
+            telegram_user_db.add_user(telegram_id) 
+            await update.message.reply_text(f"✅ Successfully registered user with telegram ID {telegram_id}!")
+        else:
+            await update.message.reply_text(f"⚠️ User not registered locally because failed to initialize in Curio application. Status: {response.status_code}")
+            
+    except Exception as e:
+        logger.error(f"Error registering user {telegram_id}: {str(e)}")
+        await update.message.reply_text(f"❌ Error registering user: {str(e)}")
+
+
+async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """List all registered users."""
+    print_user_details(update)
+    user = update.effective_user
+    
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    
+    try:
+        users = telegram_user_db.get_all_users()
+        if users:
+            user_list = "\n".join([f"• {user_id}" for user_id in users])
+            await update.message.reply_text(f"📋 Registered Users ({len(users)} total):\n{user_list}")
+        else:
+            await update.message.reply_text("📋 No users registered yet.")
+    except Exception as e:
+        logger.error(f"Error listing users: {str(e)}")
+        await update.message.reply_text(f"❌ Error listing users: {str(e)}")
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show help message."""
+    user = update.effective_user
+    
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    
+    help_text = """
+🤖 Curio Admin Bot Help
+
+Available commands:
+/start - Welcome message and basic info
+/register <telegram_id> - Register a new user
+/list_users - Show all registered users
+/help - Show this help message
+
+Examples:
+/register 123456789
+/list_users
+    """
+    await update.message.reply_text(help_text)
+
+
+def main() -> None:
+    """Start the admin bot."""
+    # Create the Application and pass it your bot's token.
+    # PLEASE REPLACE "YOUR_ADMIN_BOT_TOKEN_HERE" WITH YOUR ACTUAL ADMIN BOT TOKEN
+    application = Application.builder().token(ADMIN_BOT_TOKEN).build()
+    
+    # Add command handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("register", register_user))
+    application.add_handler(CommandHandler("list_users", list_users))
+    application.add_handler(CommandHandler("help", help_command))
+
+    # Run the bot until the user presses Ctrl-C
+    logger.info("Starting Curio Admin Bot...")
+    application.run_polling()
+
+
+if __name__ == "__main__":
+    main() 

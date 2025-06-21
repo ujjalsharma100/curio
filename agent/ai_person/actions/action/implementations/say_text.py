@@ -14,15 +14,15 @@ class SayTextAction(Action):
         self.memory = Memory()
         super().__init__(description, name, args)
 
-    def execute(self, args: dict[str, Any]):
+    def execute(self, agent_id: str, args: dict[str, Any]):
         try:
             message = args['message']
-            self.say_text(message)
+            self.say_text(agent_id, message)
             agent_dialouge = f"You: {message}"
-            self.memory.add_dialogue_to_current_converstaion(agent_dialouge)
+            self.memory.add_dialogue_to_current_converstaion(agent_id, agent_dialouge)
         except Exception as e:
             print(e)
     
-    def say_text(self, message):
-        send_agent_message(message)
+    def say_text(self, agent_id, message):
+        send_agent_message(agent_id, message)
     

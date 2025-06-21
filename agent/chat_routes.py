@@ -18,11 +18,29 @@ def send_user_message():
     Returns:
         None: Currently just prints the message (TODO: implement agent processing)
     """
-    data = request.json
-    user_message = data["user_message"]
-    print(user_message)
+    try:
+        data = request.json
+        user_message = data["user_message"]
+        agent_id = data["agent_id"]
+        print(user_message)
 
-    # TODO: Pass the user message into the agent and process 
-    aiPerson.hear_text(user_message)
+        # TODO: Pass the user message into the agent and process 
+        aiPerson.hear_text(agent_id, user_message)
 
-    return jsonify({"message": "user message sent to agent"}), 200
+        return jsonify({"message": "user message sent to agent"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@chat_bp.route('/initialize_agent', methods=['POST'])
+def initialize_agent():
+    """
+    Initialize a new agent_id in the system (personality, user info, short term memory, etc).
+    Expects JSON: {"agent_id": "..."}
+    """
+    try:
+        data = request.json
+        agent_id = data["agent_id"]
+        aiPerson.initialize_agent(agent_id)
+        return jsonify({"message": f"Agent {agent_id} initialized."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

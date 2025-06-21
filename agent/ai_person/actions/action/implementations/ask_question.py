@@ -14,16 +14,16 @@ class AskQuestionAction(Action):
         self.memory = Memory()
         super().__init__(description=description, name=name, args=args)
     
-    def execute(self, args: dict[str, Any]):
+    def execute(self, agent_id: str, args: dict[str, Any]):
         try:
             question = args['question']
-            self.ask_question(question)
+            self.ask_question(agent_id, question)
             agent_dialouge = f"You: {question}"
-            self.memory.add_dialogue_to_current_converstaion(agent_dialouge)
+            self.memory.add_dialogue_to_current_converstaion(agent_id, agent_dialouge)
         except Exception as e:
             print(e)
 
-    def ask_question(self, question: str):
-        send_agent_message(question)
+    def ask_question(self, agent_id, question: str):
+        send_agent_message(agent_id, question)
         
     

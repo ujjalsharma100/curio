@@ -1,77 +1,46 @@
-import json
-import os
 from typing import Dict, Optional
+from .user_info_db import UserInfoDB
+import os
+import json
 
 class UserInfo:
     def __init__(self):
-        # Instance variables for user information
-        self.name: str = ""
-        self.interests: str = ""
-        self.job: str = ""
-        self.info: str = ""
-        
-        self.json_file = os.path.join(os.path.dirname(__file__), "user_info.json")
-        self.load_from_json()
-    
-    def load_from_json(self) -> None:
-        """Load user information from JSON file if it exists, otherwise create with default values"""
-        if os.path.exists(self.json_file):
-            try:
-                with open(self.json_file, 'r') as f:
-                    data = json.load(f)
-                    self.name = data.get('name', self.name)
-                    self.interests = data.get('interests', self.interests)
-                    self.job = data.get('job', self.job)
-                    self.info = data.get('info', self.info)
-            except json.JSONDecodeError:
-                print("Error reading JSON file, using default values")
-        else:
-            self.save_to_json()
-    
-    def save_to_json(self) -> None:
-        """Save current user information to JSON file"""
-        data = {
-            'name': self.name,
-            'interests': self.interests,
-            'job': self.job,
-            'info': self.info
-        }
+        self.db = UserInfoDB()
+        # Load the default template from user_info.json
+        template_path = os.path.join(os.path.dirname(__file__), "user_info.json")
         try:
-            with open(self.json_file, 'w') as f:
-                json.dump(data, f, indent=4)
-        except Exception as e:
-            print(f"Error saving to JSON: {e}")
-    
-    def get_user_info(self) -> Dict[str, str]:
-        """Get all user information as a dictionary"""
-        self.load_from_json()
-        return {
-            'name': self.name,
-            'interests': self.interests,
-            'job': self.job,
-            'info': self.info
-        }
-    
-    def update_user_info(self, field: str, value: str) -> bool:
-        """Update a specific field of user information
-        
+            with open(template_path, 'r') as f:
+                self.default_template = json.load(f)
+        except Exception:
+            self.default_template = {}
+
+    def get_user_info(self, agent_id: str) -> Dict:
+        """Get all user information for a given agent_id as a dictionary"""
+        user_info = self.db.get_user_info(agent_id)
+        if user_info is None:
+            # Return a copy of the default template
+            return dict(self.default_template)
+        return user_info
+
+    def update_user_info(self, agent_id: str, field: str, value) -> bool:
+        """Update a specific field of user information for a given agent_id
         Args:
-            field: The field to update (name, interests, job, or info)
+            agent_id: The agent identifier
+            field: The field to update (arbitrary key in user_info dict)
             value: The new value for the field
-            
         Returns:
             bool: True if update was successful, False otherwise
         """
-        self.load_from_json()
-        if not hasattr(self, field):
-            return False
-            
-        setattr(self, field, value)
-        self.save_to_json()
-        return True
-    
-    def get_user_info_text(self) -> str:
-        """Get user information in a formatted text string"""
-        self.load_from_json()
-        user_info = self.get_user_info()
+        user_info = self.db.get_user_info(agent_id) or dict(self.default_template)
+        user_info[field] = value
+        return self.db.set_user_info(agent_id, user_info)
+
+    def get_user_info_text(self, agent_id: str) -> str:
+        """Get user information for a given agent_id in a formatted text string"""
+        user_info = self.get_user_info(agent_id)
         return str(user_info)
+
+    def initialize_user_info(self, agent_id: str) -> None:
+        """Initialize user info for a new agent_id using the default template if not present."""
+        if self.db.get_user_info(agent_id) is None:
+            self.db.set_user_info(agent_id, dict(self.default_template))
