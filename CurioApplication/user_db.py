@@ -69,4 +69,23 @@ class CurioUserDB:
         c = conn.cursor()
         c.execute('INSERT OR IGNORE INTO users (user_id, telegram_id, agent_id) VALUES (?, ?, ?)', (user_id, telegram_id, agent_id))
         conn.commit()
-        conn.close() 
+        conn.close()
+
+    def user_exists(self, telegram_id: int) -> bool:
+        conn = sqlite3.connect(self.DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT 1 FROM users WHERE telegram_id = ?', (telegram_id,))
+        exists = c.fetchone() is not None
+        conn.close()
+        return exists
+
+    def get_all_users(self):
+        conn = sqlite3.connect(self.DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT user_id, telegram_id, agent_id FROM users')
+        users = [
+            {"user_id": row[0], "telegram_id": row[1], "agent_id": row[2]}
+            for row in c.fetchall()
+        ]
+        conn.close()
+        return users 

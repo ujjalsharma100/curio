@@ -2,9 +2,8 @@ import logging
 from telegram import Update, User
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 import requests
-from telegram_user_db import TelegramUserDB
-import os
 from dotenv import load_dotenv
+import os
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,9 +19,6 @@ ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")
 
 # Admin telegram ID - PLACEHOLDER - replace with actual admin telegram ID
 ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "123456789"))
-
-# Initialize the Telegram user DB
-telegram_user_db = TelegramUserDB()
 
 
 def is_admin_authorized(user: User) -> bool:
@@ -97,11 +93,6 @@ async def register_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("❌ Invalid telegram ID. Please provide a valid number.")
         return
     
-    # Check if user already exists
-    if telegram_user_db.user_exists(telegram_id):
-        await update.message.reply_text(f"⚠️ User with telegram ID {telegram_id} is already registered.")
-        return
-    
     try:
         # Call curio application to initialize new user
         curio_endpoint = get_curio_initialize_user_endpoint()
@@ -109,16 +100,11 @@ async def register_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "telegram_id": telegram_id,
             "admin_telegram_id": user.id
         }
-        
         response = requests.post(curio_endpoint, json=payload)
-        
         if response.status_code == 200:
-            # Add user to local database
-            telegram_user_db.add_user(telegram_id) 
             await update.message.reply_text(f"✅ Successfully registered user with telegram ID {telegram_id}!")
         else:
-            await update.message.reply_text(f"⚠️ User not registered locally because failed to initialize in Curio application. Status: {response.status_code}")
-            
+            await update.message.reply_text(f"⚠️ Failed to register user in Curio application. Status: {response.status_code}\n{response.text}")
     except Exception as e:
         logger.error(f"Error registering user {telegram_id}: {str(e)}")
         await update.message.reply_text(f"❌ Error registering user: {str(e)}")
@@ -134,12 +120,20 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     
     try:
-        users = telegram_user_db.get_all_users()
-        if users:
-            user_list = "\n".join([f"• {user_id}" for user_id in users])
-            await update.message.reply_text(f"📋 Registered Users ({len(users)} total):\n{user_list}")
+        curio_base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+        list_url = f"{curio_base_url}/list_users"
+        response = requests.get(list_url, timeout=5)
+        if response.status_code == 200:
+            users = response.json().get("users", [])
+            if users:
+                user_list = "\n".join([
+                    f"• telegram_id: {u['telegram_id']}, user_id: {u['user_id']}, agent_id: {u['agent_id']}" for u in users
+                ])
+                await update.message.reply_text(f"📋 Registered Users ({len(users)} total):\n{user_list}")
+            else:
+                await update.message.reply_text("📋 No users registered yet.")
         else:
-            await update.message.reply_text("📋 No users registered yet.")
+            await update.message.reply_text(f"❌ Failed to fetch users. Status: {response.status_code}")
     except Exception as e:
         logger.error(f"Error listing users: {str(e)}")
         await update.message.reply_text(f"❌ Error listing users: {str(e)}")

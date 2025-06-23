@@ -2,7 +2,6 @@ import logging
 from telegram import Update, User
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 import requests
-from telegram_user_db import TelegramUserDB
 import os
 from dotenv import load_dotenv
 
@@ -27,11 +26,6 @@ ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "123456789"))
 # Constants that don't change
 TELEGRAM_API_BASE_URL = "https://api.telegram.org"
 
-# Initialize the Telegram user DB
-telegram_user_db = TelegramUserDB()
-
-
-
 def print_user_details(update: Update) -> None:
     """Print detailed information about the user."""
     user = update.effective_user
@@ -54,8 +48,19 @@ def get_curio_application_route_endpoint():
     return f"{base_url}{route}"
 
 def is_user_authorized(user: User) -> bool:
-    return telegram_user_db.user_exists(user.id)
-
+    """Check if the user is registered by querying the CurioApplication."""
+    curio_base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+    check_url = f"{curio_base_url}/is_user_registered"
+    try:
+        response = requests.post(check_url, json={"telegram_id": user.id}, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("registered", False)
+        else:
+            return False
+    except Exception as e:
+        logger.error(f"Error checking user registration: {str(e)}")
+        return False
 
 async def send_unregistered_user_notification_to_admin(update: Update) -> None:
     """Send notification to admin bot when an unregistered user tries to use Curio."""

@@ -127,5 +127,36 @@ def add_and_initialize_user():
         print(e)
         return jsonify({"message": "Error happened", "error": str(e)}), 500
 
+@app.route('/is_user_registered', methods=['POST'])
+def is_user_registered():
+    """
+    Check if a user is registered by telegram_id.
+    Expects JSON: {"telegram_id": ...}
+    Returns: {"registered": true/false}
+    """
+    try:
+        data = request.json
+        telegram_id = data['telegram_id']
+        db = CurioUserDB()
+        registered = db.user_exists(int(telegram_id))
+        return jsonify({"registered": registered}), 200
+    except Exception as e:
+        print(e)
+        return jsonify({"registered": False, "error": str(e)}), 500
+
+@app.route('/list_users', methods=['GET'])
+def list_users():
+    """
+    Return a list of all registered users.
+    Returns: {"users": [ ... ]}
+    """
+    try:
+        db = CurioUserDB()
+        users = db.get_all_users()
+        return jsonify({"users": users}), 200
+    except Exception as e:
+        print(e)
+        return jsonify({"users": [], "error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8086, debug=True)
