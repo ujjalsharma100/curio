@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from dotenv import load_dotenv
+from datetime import datetime, date
 
 # Load environment variables from .env file
 load_dotenv()
@@ -12,6 +13,7 @@ class CurioUserDB:
     DEFAULT_AGENT_BASE_URL = os.getenv('AGENT_BASE_URL', 'http://localhost:8087')
     DEFAULT_AGENT_ENDPOINT = os.getenv('AGENT_ENDPOINT', '/curio_chat/send_user_message')
     DEFAULT_TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '7477796128:AAE7BjPgmC2z3jDnfNmDjDENks8jh7Zowvw')
+    DAILY_REQUEST_LIMIT = int(os.getenv('DAILY_REQUEST_LIMIT', '30'))
     
     # Constants that don't change
     TELEGRAM_API_BASE_URL = "https://api.telegram.org"
@@ -22,6 +24,9 @@ class CurioUserDB:
     def _ensure_db(self):
         if not os.path.exists(self.DB_PATH):
             self._create_db()
+        else:
+            # Ensure the request_tracking table exists even if DB already exists
+            self._create_request_tracking_table()
 
     def _create_db(self):
         conn = sqlite3.connect(self.DB_PATH)
@@ -33,8 +38,88 @@ class CurioUserDB:
                 agent_id TEXT UNIQUE
             )
         ''')
+        self._create_request_tracking_table(conn)
         conn.commit()
         conn.close()
+
+    def _create_request_tracking_table(self, conn=None):
+        """Create the request tracking table if it doesn't exist."""
+        if conn is None:
+            conn = sqlite3.connect(self.DB_PATH)
+        
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS request_tracking (
+                telegram_id INTEGER,
+                request_date DATE,
+                request_count INTEGER DEFAULT 0,
+                PRIMARY KEY (telegram_id, request_date)
+            )
+        ''')
+        
+        if conn is None:
+            conn.commit()
+            conn.close()
+
+    def check_and_increment_request_count(self, telegram_id: int) -> tuple[bool, int]:
+        """
+        Check if user has exceeded daily limit and increment request count.
+        
+        Returns:
+            tuple: (limit_exceeded: bool, current_count: int)
+        """
+        today = date.today().isoformat()
+        
+        conn = sqlite3.connect(self.DB_PATH)
+        c = conn.cursor()
+        
+        # Get current count for today
+        c.execute('''
+            SELECT request_count FROM request_tracking 
+            WHERE telegram_id = ? AND request_date = ?
+        ''', (telegram_id, today))
+        
+        row = c.fetchone()
+        current_count = row[0] if row else 0
+        
+        # Check if limit exceeded
+        if current_count >= self.DAILY_REQUEST_LIMIT:
+            conn.close()
+            return True, current_count
+        
+        # Increment count
+        if row:
+            c.execute('''
+                UPDATE request_tracking 
+                SET request_count = request_count + 1 
+                WHERE telegram_id = ? AND request_date = ?
+            ''', (telegram_id, today))
+        else:
+            c.execute('''
+                INSERT INTO request_tracking (telegram_id, request_date, request_count)
+                VALUES (?, ?, 1)
+            ''', (telegram_id, today))
+        
+        conn.commit()
+        conn.close()
+        
+        return False, current_count + 1
+
+    def get_user_request_count(self, telegram_id: int) -> int:
+        """Get the current request count for a user today."""
+        today = date.today().isoformat()
+        
+        conn = sqlite3.connect(self.DB_PATH)
+        c = conn.cursor()
+        c.execute('''
+            SELECT request_count FROM request_tracking 
+            WHERE telegram_id = ? AND request_date = ?
+        ''', (telegram_id, today))
+        
+        row = c.fetchone()
+        conn.close()
+        
+        return row[0] if row else 0
 
     def get_agent_id_from_telegram_id(self, telegram_id: int) -> str:
         conn = sqlite3.connect(self.DB_PATH)

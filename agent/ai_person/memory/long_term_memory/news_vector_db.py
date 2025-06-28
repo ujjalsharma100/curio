@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime
 import os
 import chromadb
-from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 import logging
 
@@ -63,10 +62,16 @@ class NewsVectorDB:
         logger.debug("Initializing ChromaDB client")
         self.client = chromadb.PersistentClient(path=db_path)
         
-        # Create embedding function using the model
-        logger.debug("Creating embedding function with model: all-MiniLM-L6-v2")
-        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
+        # Get OpenAI API key from environment variable
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        
+        # Create embedding function using OpenAI API
+        logger.debug("Creating OpenAI embedding function with model: text-embedding-3-small")
+        self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
+            api_key=openai_api_key,
+            model_name="text-embedding-3-small"
         )
         
         # Get or create collection

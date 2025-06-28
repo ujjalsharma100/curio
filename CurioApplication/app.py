@@ -45,8 +45,20 @@ def route_telegram_user_message():
         print(data)
         user_message = data['user_message']
         telegram_id = data['telegram_id']
+        
+        # Check daily request limit
+        db = CurioUserDB()
+        limit_exceeded, current_count = db.check_and_increment_request_count(int(telegram_id))
+        
+        if limit_exceeded:
+            # Send limit exceeded message to user
+            limit_message = f"Daily request limit exceeded. You have used {current_count} requests today. Please try again tomorrow."
+            message_router.route_agent_message_to_telegram(limit_message, int(telegram_id), db.get_agent_id_from_telegram_id(int(telegram_id)))
+            return jsonify({"message": "Daily limit exceeded", "limit_exceeded": True}), 429
+        
+        # Process the message normally
         message_router.route_telegram_user_message(user_message, telegram_id)
-        return jsonify({"message": "telegram message routed"}), 200
+        return jsonify({"message": "telegram message routed", "limit_exceeded": False}), 200
     except Exception as e:
         print(e)
         return jsonify({"message": "Error happened!"}), 200
@@ -157,6 +169,30 @@ def list_users():
     except Exception as e:
         print(e)
         return jsonify({"users": [], "error": str(e)}), 500
+
+@app.route('/check_user_request_limit', methods=['POST'])
+def check_user_request_limit():
+    """
+    Check a user's current daily request count and limit status.
+    Expects JSON: {"telegram_id": ...}
+    Returns: {"current_count": int, "daily_limit": int, "limit_exceeded": bool}
+    """
+    try:
+        data = request.json
+        telegram_id = data['telegram_id']
+        db = CurioUserDB()
+        current_count = db.get_user_request_count(int(telegram_id))
+        daily_limit = db.DAILY_REQUEST_LIMIT
+        limit_exceeded = current_count >= daily_limit
+        
+        return jsonify({
+            "current_count": current_count,
+            "daily_limit": daily_limit,
+            "limit_exceeded": limit_exceeded
+        }), 200
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8086, debug=True)

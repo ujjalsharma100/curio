@@ -48,13 +48,13 @@ logger = setup_logging()
 
 class AiPerson:
     def __init__(self):
-        logger.info("Initializing AiPerson")
+        logger.info("Initializing AiPerson", extra={'agent_id': "system"})
         self.identity = Identity()
         self.personality = Personality()
         self.purpose = Purpose()
         self.memory = Memory()
         self.actions = Actions()
-        logger.info("AiPerson initialization complete")
+        logger.info("AiPerson initialization complete", extra={'agent_id': "system"})
     
 
     def hear_text(self, agent_id: str, text: str) -> None:
