@@ -35,7 +35,8 @@ class CurioUserDB:
             CREATE TABLE IF NOT EXISTS users (
                 user_id TEXT UNIQUE,
                 telegram_id INTEGER UNIQUE,
-                agent_id TEXT UNIQUE
+                agent_id TEXT UNIQUE,
+                active BOOLEAN NOT NULL DEFAULT 1
             )
         ''')
         self._create_request_tracking_table(conn)
@@ -121,6 +122,16 @@ class CurioUserDB:
         
         return row[0] if row else 0
 
+    def is_user_active(self, telegram_id: int) -> bool:
+        conn = sqlite3.connect(self.DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT active FROM users WHERE telegram_id = ?', (telegram_id,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            return bool(row[0])
+        return False
+
     def get_agent_id_from_telegram_id(self, telegram_id: int) -> str:
         conn = sqlite3.connect(self.DB_PATH)
         c = conn.cursor()
@@ -164,12 +175,19 @@ class CurioUserDB:
         conn.close()
         return exists
 
+    def deactivate_user(self, telegram_id: int):
+        conn = sqlite3.connect(self.DB_PATH)
+        c = conn.cursor()
+        c.execute('UPDATE users SET active = 0 WHERE telegram_id = ?', (telegram_id,))
+        conn.commit()
+        conn.close()
+
     def get_all_users(self):
         conn = sqlite3.connect(self.DB_PATH)
         c = conn.cursor()
-        c.execute('SELECT user_id, telegram_id, agent_id FROM users')
+        c.execute('SELECT user_id, telegram_id, agent_id, active FROM users')
         users = [
-            {"user_id": row[0], "telegram_id": row[1], "agent_id": row[2]}
+            {"user_id": row[0], "telegram_id": row[1], "agent_id": row[2], "active": bool(row[3])}
             for row in c.fetchall()
         ]
         conn.close()

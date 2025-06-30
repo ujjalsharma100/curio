@@ -54,3 +54,17 @@ class Memory:
         """Initialize memory for a new agent_id."""
         self.short_term_memory.initialize_short_term_memory(agent_id)
         self.long_term_memory.user_info.initialize_user_info(agent_id)
+
+    def get_last_human_dialogue(self, agent_id: str) -> Optional[str]:
+        """Returns the most recent dialogue line that starts with 'Human:' from the current conversation."""
+        conversation_text = self.get_current_conversation(agent_id)
+        lines = conversation_text.strip().split('\n')
+        for line in reversed(lines):
+            # Check if the line contains 'Human:' after the timestamp
+            if 'Human:' in line:
+                # Optionally, you can check for the pattern after the timestamp
+                # e.g., [timestamp] Human: ...
+                after_bracket = line.split(']', 1)[-1] if ']' in line else line
+                if after_bracket.strip().startswith('Human:'):
+                    return line.strip()
+        return None

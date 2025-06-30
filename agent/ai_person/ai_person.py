@@ -109,6 +109,10 @@ class AiPerson:
             Also include that in the response. Respond with the full text that needs to go in the Converstaional behvaior section. 
             
             Don't include the update sections if not required to update.
+
+            Sometimes the human dialogue can have [System] in the begnining of the dialogue it means the text didn't directly come from the human.
+            It came from the a system that is working on the user's behalf. Understand that decide on the action that way. 
+            But think in the way that you have decided that to send yourself rather than system asking you.
             
             There is also a debugInfo sections which you can fill if desired. 
             Don't keep it more than 3 lines and include only if required. 

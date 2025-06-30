@@ -32,3 +32,15 @@ def route_agent_message_to_telegram(agent_message: str, telegram_id: int, agent_
         "disable_web_page_preview": False
     }
     requests.post(telegram_url, json=payload)
+
+
+def send_system_news_update_to_all_users(system_message: str = '[System] I think its time to get some new updates') -> None:
+    """Send a system news update message to all active users."""
+    db = CurioUserDB()
+    users = db.get_all_users()
+    for user in users:
+        if user.get('active'):
+            telegram_id = user.get('telegram_id')
+            agent_id = user.get('agent_id')
+            if telegram_id and agent_id:
+                route_agent_message_to_telegram(system_message, telegram_id, agent_id)

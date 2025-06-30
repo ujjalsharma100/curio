@@ -78,6 +78,10 @@ class FetchLatestAINewsAction(Action):
             else:
                 self.logger.debug(f"No content retrieved for new update for agent_id {agent_id}: {ai_update['link']}")
         
+        if not final_ai_updates and (last_human_dialogue := self.memory.get_last_human_dialogue(agent_id=agent_id)) and "[System]" in last_human_dialogue:
+            self.logger.info(f"Last dialogue was a system message and no updates found. Suppressing notification for agent_id: {agent_id}")
+            return
+
         self.logger.info(f"Final AI updates after processing for agent_id {agent_id}: {len(final_ai_updates)}")
         ai_updates_string = json.dumps(final_ai_updates)
         self.logger.debug(f"AI updates JSON string length for agent_id {agent_id}: {len(ai_updates_string)} characters")
@@ -100,6 +104,11 @@ class FetchLatestAINewsAction(Action):
         Based on the current converstation, all the context and AI news information.
         You have to send the the human the Ai news information that would be relevant to the human.
         If AI news information is empty, communicate that to the human that theres nothing new.
+        
+        Sometimes the human dialogue can have [System] in the begnining of the dialogue it means the text didn't directly come from the human.    
+        It came from the a system that is working on the user's behalf. Understand that and respond that way. 
+        But craft response in a way that you have decided that to send yourself.
+        
         The response should the text you would be sending to the human. 
         The text should also contain insights on why it would be relevant to the humnan and improvise on it a bit.
         The responses should only be the text to be send to the human. Include nothing else.

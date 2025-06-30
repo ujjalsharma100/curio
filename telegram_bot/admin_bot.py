@@ -66,7 +66,10 @@ I'm here to help you manage user registrations for the Curio AI assistant.
 
 Available commands:
 /register <telegram_id> - Register a new user with the given telegram ID
+/deactivate <telegram_id> - Deactivate an existing user
 /list_users - List all registered users
+/system_message <message> - Send a system message to all users
+/send_news_updates_to_all_users - Send the default news update to all users
 /help - Show this help message
 
 Example: /register 123456789
@@ -110,6 +113,43 @@ async def register_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text(f"❌ Error registering user: {str(e)}")
 
 
+async def deactivate_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Deactivate a user with the given telegram ID."""
+    print_user_details(update)
+    user = update.effective_user
+    
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    
+    if not context.args:
+        await update.message.reply_text("❌ Please provide a telegram ID.\nUsage: /deactivate <telegram_id>")
+        return
+    
+    try:
+        telegram_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Invalid telegram ID. Please provide a valid number.")
+        return
+    
+    try:
+        curio_base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+        deactivate_url = f"{curio_base_url}/deactivate_user"
+        payload = {
+            "telegram_id": telegram_id,
+            "admin_telegram_id": user.id
+        }
+        response = requests.post(deactivate_url, json=payload)
+        
+        if response.status_code == 200:
+            await update.message.reply_text(f"✅ Successfully deactivated user with telegram ID {telegram_id}.")
+        else:
+            await update.message.reply_text(f"⚠️ Failed to deactivate user. Status: {response.status_code}\n{response.text}")
+    except Exception as e:
+        logger.error(f"Error deactivating user {telegram_id}: {str(e)}")
+        await update.message.reply_text(f"❌ Error deactivating user: {str(e)}")
+
+
 async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List all registered users."""
     print_user_details(update)
@@ -139,6 +179,58 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text(f"❌ Error listing users: {str(e)}")
 
 
+async def system_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send a system message to all users."""
+    print_user_details(update)
+    user = update.effective_user
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    if not context.args:
+        await update.message.reply_text("❌ Please provide a message.\nUsage: /system_message <message>")
+        return
+    system_message_text = " ".join(context.args)
+    try:
+        curio_base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+        endpoint = f"{curio_base_url}/send_system_message_to_all_users"
+        payload = {
+            "admin_telegram_id": user.id,
+            "system_message": system_message_text
+        }
+        response = requests.post(endpoint, json=payload)
+        if response.status_code == 200:
+            await update.message.reply_text("✅ System message sent to all users.")
+        else:
+            await update.message.reply_text(f"⚠️ Failed to send system message. Status: {response.status_code}\n{response.text}")
+    except Exception as e:
+        logger.error(f"Error sending system message: {str(e)}")
+        await update.message.reply_text(f"❌ Error sending system message: {str(e)}")
+
+
+async def send_news_updates_to_all_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send the default system news update to all users."""
+    print_user_details(update)
+    user = update.effective_user
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    try:
+        curio_base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+        endpoint = f"{curio_base_url}/send_system_message_to_all_users"
+        payload = {
+            "admin_telegram_id": user.id
+            # No 'system_message' key, so the backend uses the default
+        }
+        response = requests.post(endpoint, json=payload)
+        if response.status_code == 200:
+            await update.message.reply_text("✅ News update sent to all users.")
+        else:
+            await update.message.reply_text(f"⚠️ Failed to send news update. Status: {response.status_code}\n{response.text}")
+    except Exception as e:
+        logger.error(f"Error sending news update: {str(e)}")
+        await update.message.reply_text(f"❌ Error sending news update: {str(e)}")
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show help message."""
     user = update.effective_user
@@ -153,12 +245,18 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 Available commands:
 /start - Welcome message and basic info
 /register <telegram_id> - Register a new user
+/deactivate <telegram_id> - Deactivate an existing user
 /list_users - Show all registered users
+/system_message <message> - Send a system message to all users
+/send_news_updates_to_all_users - Send the default news update to all users
 /help - Show this help message
 
 Examples:
 /register 123456789
+/deactivate 987654321
 /list_users
+/system_message Hello, this is a system-wide update!
+/send_news_updates_to_all_users
     """
     await update.message.reply_text(help_text)
 
@@ -172,7 +270,10 @@ def main() -> None:
     # Add command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("register", register_user))
+    application.add_handler(CommandHandler("deactivate", deactivate_user))
     application.add_handler(CommandHandler("list_users", list_users))
+    application.add_handler(CommandHandler("system_message", system_message))
+    application.add_handler(CommandHandler("send_news_updates_to_all_users", send_news_updates_to_all_users))
     application.add_handler(CommandHandler("help", help_command))
 
     # Run the bot until the user presses Ctrl-C
