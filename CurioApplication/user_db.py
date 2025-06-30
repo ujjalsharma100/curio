@@ -191,4 +191,29 @@ class CurioUserDB:
             for row in c.fetchall()
         ]
         conn.close()
-        return users 
+        return users
+
+    def reset_user_request_count(self, telegram_id: int) -> None:
+        """Reset the user's request count for today to 0."""
+        today = date.today().isoformat()
+        conn = sqlite3.connect(self.DB_PATH)
+        c = conn.cursor()
+        # Check if a row exists for today
+        c.execute('''
+            SELECT request_count FROM request_tracking 
+            WHERE telegram_id = ? AND request_date = ?
+        ''', (telegram_id, today))
+        row = c.fetchone()
+        if row:
+            c.execute('''
+                UPDATE request_tracking 
+                SET request_count = 0 
+                WHERE telegram_id = ? AND request_date = ?
+            ''', (telegram_id, today))
+        else:
+            c.execute('''
+                INSERT INTO request_tracking (telegram_id, request_date, request_count)
+                VALUES (?, ?, 0)
+            ''', (telegram_id, today))
+        conn.commit()
+        conn.close() 

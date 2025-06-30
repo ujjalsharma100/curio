@@ -80,6 +80,8 @@ class FetchLatestAINewsAction(Action):
         
         if not final_ai_updates and (last_human_dialogue := self.memory.get_last_human_dialogue(agent_id=agent_id)) and "[System]" in last_human_dialogue:
             self.logger.info(f"Last dialogue was a system message and no updates found. Suppressing notification for agent_id: {agent_id}")
+            agent_dialogue = "You: [System] No news is found"
+            self.memory.add_dialogue_to_current_converstaion(agent_id, agent_dialogue)
             return
 
         self.logger.info(f"Final AI updates after processing for agent_id {agent_id}: {len(final_ai_updates)}")
@@ -106,8 +108,8 @@ class FetchLatestAINewsAction(Action):
         If AI news information is empty, communicate that to the human that theres nothing new.
         
         Sometimes the human dialogue can have [System] in the begnining of the dialogue it means the text didn't directly come from the human.    
-        It came from the a system that is working on the user's behalf. Understand that and respond that way. 
-        But craft response in a way that you have decided that to send yourself.
+        It came from the a system that is working on the human's behalf. Understand that and respond that way. 
+        Craft response in a way that you have decided that to send yourself.
         
         The response should the text you would be sending to the human. 
         The text should also contain insights on why it would be relevant to the humnan and improvise on it a bit.

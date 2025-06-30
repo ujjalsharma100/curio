@@ -70,6 +70,7 @@ Available commands:
 /list_users - List all registered users
 /system_message <message> - Send a system message to all users
 /send_news_updates_to_all_users - Send the default news update to all users
+/reset_limit <telegram_id> - Reset a user's request limit for today to 0
 /help - Show this help message
 
 Example: /register 123456789
@@ -249,6 +250,7 @@ Available commands:
 /list_users - Show all registered users
 /system_message <message> - Send a system message to all users
 /send_news_updates_to_all_users - Send the default news update to all users
+/reset_limit <telegram_id> - Reset a user's request limit for today to 0
 /help - Show this help message
 
 Examples:
@@ -257,8 +259,41 @@ Examples:
 /list_users
 /system_message Hello, this is a system-wide update!
 /send_news_updates_to_all_users
+/reset_limit 123456789
     """
     await update.message.reply_text(help_text)
+
+
+async def reset_limit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reset a user's request limit for today to 0."""
+    print_user_details(update)
+    user = update.effective_user
+    if not is_admin_authorized(user):
+        await update.message.reply_text("❌ Unauthorized access. This bot is restricted to admin use only.")
+        return
+    if not context.args:
+        await update.message.reply_text("❌ Please provide a telegram ID.\nUsage: /reset_limit <telegram_id>")
+        return
+    try:
+        telegram_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Invalid telegram ID. Please provide a valid number.")
+        return
+    try:
+        curio_base_url = os.getenv("CURIO_BASE_URL", "http://localhost:8086")
+        reset_url = f"{curio_base_url}/reset_user_request_limit"
+        payload = {
+            "telegram_id": telegram_id,
+            "admin_telegram_id": user.id
+        }
+        response = requests.post(reset_url, json=payload)
+        if response.status_code == 200:
+            await update.message.reply_text(f"✅ Successfully reset request limit for user {telegram_id}.")
+        else:
+            await update.message.reply_text(f"⚠️ Failed to reset request limit. Status: {response.status_code}\n{response.text}")
+    except Exception as e:
+        logger.error(f"Error resetting request limit for user {telegram_id}: {str(e)}")
+        await update.message.reply_text(f"❌ Error resetting request limit: {str(e)}")
 
 
 def main() -> None:
@@ -275,6 +310,7 @@ def main() -> None:
     application.add_handler(CommandHandler("system_message", system_message))
     application.add_handler(CommandHandler("send_news_updates_to_all_users", send_news_updates_to_all_users))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("reset_limit", reset_limit))
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Starting Curio Admin Bot...")

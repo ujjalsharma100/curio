@@ -6,9 +6,6 @@ import uuid
 import requests
 import os
 from dotenv import load_dotenv
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-import pytz
 
 # Load environment variables from .env file
 load_dotenv()
@@ -269,21 +266,35 @@ def send_system_message_to_all_users():
         print(e)
         return jsonify({"message": "Error happened", "error": str(e)}), 500
 
-if __name__ == '__main__':
-    # Set up scheduler for system news update
-    scheduler = BackgroundScheduler(timezone=pytz.timezone('Asia/Kolkata'))
-    scheduler.add_job(
-        message_router.send_system_news_update_to_all_users,
-        CronTrigger(hour=9, minute=0),
-        id='morning_news_update',
-        replace_existing=True
-    )
-    scheduler.add_job(
-        message_router.send_system_news_update_to_all_users,
-        CronTrigger(hour=17, minute=0),
-        id='evening_news_update',
-        replace_existing=True
-    )
-    scheduler.start()
+@app.route('/reset_user_request_limit', methods=['POST'])
+def reset_user_request_limit():
+    """
+    Reset a user's current daily request count to 0 (admin only).
+    Expects JSON: {"telegram_id": ..., "admin_telegram_id": ...}
+    Returns: {"message": str}
+    """
+    try:
+        data = request.json
+        telegram_id = data['telegram_id']
+        admin_telegram_id = data['admin_telegram_id']
 
+        # Validate admin_telegram_id
+        if not ADMIN_TELEGRAM_ID:
+            return jsonify({"message": "ADMIN_TELEGRAM_ID not configured", "error": "Server configuration error"}), 500
+        try:
+            admin_telegram_id_int = int(admin_telegram_id)
+            configured_admin_id_int = int(ADMIN_TELEGRAM_ID)
+        except (ValueError, TypeError):
+            return jsonify({"message": "Invalid admin_telegram_id format", "error": "admin_telegram_id must be a valid integer"}), 400
+        if admin_telegram_id_int != configured_admin_id_int:
+            return jsonify({"message": "Unauthorized access", "error": "Invalid admin_telegram_id"}), 403
+
+        db = CurioUserDB()
+        db.reset_user_request_count(int(telegram_id))
+        return jsonify({"message": f"User {telegram_id} request count reset to 0"}), 200
+    except Exception as e:
+        print(e)
+        return jsonify({"message": "Error happened", "error": str(e)}), 500
+
+if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8086, debug=True)
