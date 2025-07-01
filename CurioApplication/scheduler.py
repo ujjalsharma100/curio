@@ -14,7 +14,7 @@ if __name__ == '__main__':
     )
     scheduler.add_job(
         message_router.send_system_news_update_to_all_users,
-        CronTrigger(hour=21, minute=36),
+        CronTrigger(hour=17, minute=0),
         id='evening_news_update',
         replace_existing=True
     )
