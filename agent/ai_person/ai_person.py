@@ -126,7 +126,17 @@ class AiPerson:
             response_from_llm = get_response_from_llm(prompt=prompt)
             logger.info(f"Prompt to LLM {prompt}", extra={'agent_id': agent_id})
 
-            response_json = json.loads(response_from_llm)
+            # Null and type checks for response_from_llm
+            if not response_from_llm or not isinstance(response_from_llm, str):
+                logger.error(f"Invalid response from LLM: {response_from_llm}", extra={'agent_id': agent_id})
+                print("Error: Invalid response from LLM.")
+                return
+            try:
+                response_json = json.loads(response_from_llm)
+            except Exception as e:
+                logger.error(f"Failed to parse LLM response as JSON: {response_from_llm}", extra={'agent_id': agent_id})
+                print(f"Error: Failed to parse LLM response as JSON. {e}")
+                return
             logger.debug(f"Parsed LLM response: {json.dumps(response_json, indent=2)}", extra={'agent_id': agent_id})
             print(response_json)
 

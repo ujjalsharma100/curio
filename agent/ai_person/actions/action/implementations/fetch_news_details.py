@@ -80,8 +80,14 @@ class FetchNewsDetailsAction(Action):
 
         self.logger.info(f"Calling LLM service for response generation for agent_id: {agent_id}")
         response_text = get_response_from_llm(prompt=prompt)
-        self.logger.info(f"Received response from LLM for agent_id {agent_id}, length: {len(response_text)} characters")
+        self.logger.info(f"Received response from LLM for agent_id {agent_id}, length: {len(str(response_text))} characters")
         self.logger.debug(f"LLM response for agent_id {agent_id}: {response_text}")
+        
+        # Null and type checks for response_text
+        if not response_text or not isinstance(response_text, str):
+            self.logger.error(f"Invalid response from LLM: {response_text}")
+            print("Error: Invalid response from LLM.")
+            return
         
         self.logger.info(f"Sending agent message to human for agent_id: {agent_id}")
         send_agent_message(agent_id, response_text)

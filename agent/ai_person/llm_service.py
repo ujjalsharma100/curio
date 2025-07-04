@@ -33,8 +33,11 @@ def get_response_from_anthropic(prompt: str) -> str:
         )
         print("llm response: \n")
         print(message)
-        response_text = message.content[0].text.strip()
-        print("response_text:\n" + response_text)
+        # Null check for message and its content
+        response_text = None
+        if message and hasattr(message, 'content') and message.content and isinstance(message.content, list) and len(message.content) > 0 and hasattr(message.content[0], 'text'):
+            response_text = message.content[0].text.strip()
+            print("response_text:\n" + response_text)
         return response_text
 
     except Exception as e:
@@ -48,7 +51,13 @@ def get_response_from_ollama(prompt: str) -> str:
         
         print("llm response: \n")
         print(response)
-        response_text = response['message']['content']
+        # Null check for response and its structure
+        response_text = None
+        if response and 'message' in response and response['message'] and 'content' in response['message']:
+            response_text = response['message']['content']
+        else:
+            print("Warning: No valid response from Ollama LLM.")
+            response_text = "[No valid response from LLM]"
         print("response_text:\n" + response_text)
         return response_text
     except Exception as e:
