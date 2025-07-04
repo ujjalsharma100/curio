@@ -1,6 +1,8 @@
 from anthropic import Anthropic
 import ollama
 import os
+import re
+import json
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -9,6 +11,68 @@ load_dotenv()
 # Get API key and LLM choice from environment variables
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 llm_choice = os.getenv("LLM_CHOICE", "anthropic")
+
+def sanitize_llm_response(raw_response: str):
+    """
+    Sanitize LLM response to be ready for JSON parsing.
+    Handles common issues like unescaped newlines, markdown formatting, etc.
+    """
+    if not raw_response or not isinstance(raw_response, str):
+        return ""
+    
+    # Step 1: Remove any invalid control characters (like unescaped newlines in strings)
+    # Only fix inside strings: This regex finds quoted strings and replaces internal newlines
+    def fix_string_newlines(match):
+        content = match.group(0)
+        # Replace unescaped newlines with literal \n inside quoted strings
+        fixed = content.replace('\n', '\\n')
+        return fixed
+
+    # Replace strings with escaped newlines
+    sanitized = re.sub(r'\"(.*?)\"', fix_string_newlines, raw_response, flags=re.DOTALL)
+    
+    # Step 2: Remove markdown code blocks
+    sanitized = re.sub(r'```json\s*', '', sanitized)
+    sanitized = re.sub(r'```\s*$', '', sanitized)
+    
+    # Step 3: Remove any text before the first {
+    first_brace = sanitized.find('{')
+    if first_brace != -1:
+        sanitized = sanitized[first_brace:]
+    
+    # Step 4: Remove any text after the last }
+    last_brace = sanitized.rfind('}')
+    if last_brace != -1:
+        sanitized = sanitized[:last_brace + 1]
+    
+    # Step 5: Remove common prefixes that LLMs sometimes add
+    prefixes_to_remove = [
+        "Here's the response:",
+        "Response:",
+        "Answer:",
+        "The response is:",
+        "JSON response:",
+        "Here's the JSON:",
+        "The JSON is:"
+    ]
+    
+    for prefix in prefixes_to_remove:
+        if sanitized.startswith(prefix):
+            sanitized = sanitized[len(prefix):].strip()
+    
+    # Step 6: Remove any trailing text after the JSON
+    suffixes_to_remove = [
+        "I hope this helps!",
+        "Let me know if you need anything else!",
+        "Is there anything else you'd like me to help with?",
+        "Feel free to ask if you have more questions!"
+    ]
+    
+    for suffix in suffixes_to_remove:
+        if sanitized.endswith(suffix):
+            sanitized = sanitized[:-len(suffix)].strip()
+    
+    return sanitized
 
 def get_response_from_llm(prompt: str) -> str:
     if llm_choice == 'anthropic':

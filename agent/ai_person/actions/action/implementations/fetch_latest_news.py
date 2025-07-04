@@ -128,7 +128,7 @@ class FetchLatestAINewsAction(Action):
             self.logger.error(f"Invalid response from LLM: {response_text}")
             print("Error: Invalid response from LLM.")
             return
-        
+
         self.logger.info(f"Sending agent message to human for agent_id: {agent_id}")
         send_agent_message(agent_id, response_text)
         agent_dialogue = f"You: {response_text}"

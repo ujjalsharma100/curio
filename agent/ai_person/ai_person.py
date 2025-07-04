@@ -3,7 +3,7 @@ from .personality import Personality
 from .identity import Identity
 from .purpose import Purpose
 from .actions import Actions
-from .llm_service import get_response_from_llm
+from .llm_service import get_response_from_llm, sanitize_llm_response
 import json
 import logging
 import os
@@ -131,10 +131,18 @@ class AiPerson:
                 logger.error(f"Invalid response from LLM: {response_from_llm}", extra={'agent_id': agent_id})
                 print("Error: Invalid response from LLM.")
                 return
+            
+            # Sanitize the response for JSON parsing
+            sanitized_response = sanitize_llm_response(response_from_llm)
+            if not sanitized_response:
+                logger.error("Failed to sanitize LLM response", extra={'agent_id': agent_id})
+                print("Error: Failed to sanitize LLM response.")
+                return
+                
             try:
-                response_json = json.loads(response_from_llm)
+                response_json = json.loads(sanitized_response)
             except Exception as e:
-                logger.error(f"Failed to parse LLM response as JSON: {response_from_llm}", extra={'agent_id': agent_id})
+                logger.error(f"Failed to parse sanitized LLM response as JSON: {sanitized_response}", extra={'agent_id': agent_id})
                 print(f"Error: Failed to parse LLM response as JSON. {e}")
                 return
             logger.debug(f"Parsed LLM response: {json.dumps(response_json, indent=2)}", extra={'agent_id': agent_id})
