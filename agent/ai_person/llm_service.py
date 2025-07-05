@@ -27,9 +27,13 @@ def sanitize_llm_response(raw_response: str):
     def fix_string_newlines(match):
         content = match.group(0)
         # Replace unescaped newlines with literal \n inside quoted strings
-        fixed = content.replace('\n', '\\n')
+        # But preserve already escaped newlines
+        fixed = content.replace('\n', '\\n').replace('\\\\n', '\\n')
         return fixed
 
+    # Replace strings with escaped newlines, but be more careful about JSON structure
+    # Use a more precise regex that doesn't break JSON structure
+    sanitized = re.sub(r'\"([^\"\\]*(?:\\.[^\"\\]*)*)\"', fix_string_newlines, raw_response)
     print(f"Sanitized response length: {len(sanitized)}")
     print(f"Sanitized response: {sanitized}")
     
