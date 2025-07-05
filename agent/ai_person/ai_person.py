@@ -3,7 +3,7 @@ from .personality import Personality
 from .identity import Identity
 from .purpose import Purpose
 from .actions import Actions
-from .llm_service import get_response_from_llm, sanitize_llm_response
+from .llm_service import get_response_from_llm
 import json
 import logging
 import os
@@ -132,43 +132,23 @@ class AiPerson:
                 print("Error: Invalid response from LLM.")
                 return
             
-            # First try to parse the response as-is
+            # Parse the response as JSON
             try:
                 response_json = json.loads(response_from_llm)
-                logger.debug(f"Successfully parsed LLM response without sanitization", extra={'agent_id': agent_id})
+                logger.debug(f"Successfully parsed LLM response", extra={'agent_id': agent_id})
             except json.JSONDecodeError as e:
-                logger.debug(f"Initial JSON parsing failed, attempting sanitization: {e}", extra={'agent_id': agent_id})
-                print(f"Initial JSON parsing failed, attempting sanitization: {e}")
+                logger.error(f"Failed to parse LLM response as JSON: {response_from_llm}", extra={'agent_id': agent_id})
+                logger.error(f"JSON decode error: {e}", extra={'agent_id': agent_id})
+                print(f"Error: Failed to parse LLM response as JSON. {e}")
+                print(f"Error position: {e.pos}")
+                print(f"Error line: {e.lineno}, column: {e.colno}")
                 
-                # Only sanitize when there's a JSON parsing error
-                sanitized_response = sanitize_llm_response(response_from_llm)
-                if not sanitized_response:
-                    logger.error("Failed to sanitize LLM response", extra={'agent_id': agent_id})
-                    print("Error: Failed to sanitize LLM response.")
-                    return
-                
-                logger.debug(f"Sanitized response: {sanitized_response}", extra={'agent_id': agent_id})
-                print(f"Sanitized response: {sanitized_response}")
-                
-                try:
-                    response_json = json.loads(sanitized_response)
-                except json.JSONDecodeError as e2:
-                    logger.error(f"Failed to parse sanitized LLM response as JSON: {sanitized_response}", extra={'agent_id': agent_id})
-                    logger.error(f"JSON decode error: {e2}", extra={'agent_id': agent_id})
-                    print(f"Error: Failed to parse LLM response as JSON. {e2}")
-                    print(f"Error position: {e2.pos}")
-                    print(f"Error line: {e2.lineno}, column: {e2.colno}")
-                    
-                    # Show the problematic area
-                    if e2.pos < len(sanitized_response):
-                        start = max(0, e2.pos - 100)
-                        end = min(len(sanitized_response), e2.pos + 100)
-                        print(f"Error around position {e2.pos}: {sanitized_response[start:end]}")
-                    return
-                except Exception as e3:
-                    logger.error(f"Unexpected error parsing sanitized JSON: {e3}", extra={'agent_id': agent_id})
-                    print(f"Error: Unexpected error parsing sanitized JSON. {e3}")
-                    return
+                # Show the problematic area
+                if e.pos < len(response_from_llm):
+                    start = max(0, e.pos - 100)
+                    end = min(len(response_from_llm), e.pos + 100)
+                    print(f"Error around position {e.pos}: {response_from_llm[start:end]}")
+                return
             except Exception as e:
                 logger.error(f"Unexpected error parsing JSON: {e}", extra={'agent_id': agent_id})
                 print(f"Error: Unexpected error parsing JSON. {e}")

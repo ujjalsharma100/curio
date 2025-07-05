@@ -1,7 +1,6 @@
 from anthropic import Anthropic
 import ollama
 import os
-import re
 import json
 from dotenv import load_dotenv
 
@@ -11,33 +10,6 @@ load_dotenv()
 # Get API key and LLM choice from environment variables
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 llm_choice = os.getenv("LLM_CHOICE", "anthropic")
-
-def sanitize_llm_response(raw_response: str):
-    """
-    Sanitize LLM response to handle newlines in JSON strings.
-    Only fixes unescaped newlines inside quoted strings.
-    """
-    if not raw_response or not isinstance(raw_response, str):
-        return ""
-    
-    print(f"Original response length: {len(raw_response)}")
-    print(f"Original response: {raw_response}")
-    
-    # Fix unescaped newlines inside quoted strings
-    def fix_string_newlines(match):
-        content = match.group(0)
-        # Replace unescaped newlines with literal \n inside quoted strings
-        # But preserve already escaped newlines
-        fixed = content.replace('\n', '\\n').replace('\\\\n', '\\n')
-        return fixed
-
-    # Replace strings with escaped newlines, but be more careful about JSON structure
-    # Use a more precise regex that doesn't break JSON structure
-    sanitized = re.sub(r'\"([^\"\\]*(?:\\.[^\"\\]*)*)\"', fix_string_newlines, raw_response)
-    print(f"Sanitized response length: {len(sanitized)}")
-    print(f"Sanitized response: {sanitized}")
-    
-    return sanitized
 
 def get_response_from_llm(prompt: str) -> str:
     if llm_choice == 'anthropic':
