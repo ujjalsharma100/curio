@@ -30,9 +30,6 @@ def sanitize_llm_response(raw_response: str):
         fixed = content.replace('\n', '\\n')
         return fixed
 
-    # Replace strings with escaped newlines
-    sanitized = re.sub(r'\"(.*?)\"', fix_string_newlines, raw_response, flags=re.DOTALL)
-    
     print(f"Sanitized response length: {len(sanitized)}")
     print(f"Sanitized response: {sanitized}")
     
