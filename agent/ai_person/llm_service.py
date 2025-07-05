@@ -75,7 +75,7 @@ def sanitize_llm_response(raw_response: str):
         if sanitized.endswith(suffix):
             sanitized = sanitized[:-len(suffix)].strip()
     
-    # Step 7: Additional JSON validation and fixes
+    # Step 7: Additional JSON fixes
     # Fix common issues with trailing commas
     sanitized = re.sub(r',\s*}', '}', sanitized)
     sanitized = re.sub(r',\s*]', ']', sanitized)
@@ -92,35 +92,11 @@ def sanitize_llm_response(raw_response: str):
     # Apply quote fixing to string values
     sanitized = re.sub(r'\"(.*?)\"', fix_unescaped_quotes, sanitized, flags=re.DOTALL)
     
-    # Step 8: Validate JSON structure
-    try:
-        # Test if the sanitized response is valid JSON
-        json.loads(sanitized)
-        print(f"Sanitized response is valid JSON, length: {len(sanitized)}")
-        return sanitized
-    except json.JSONDecodeError as e:
-        print(f"JSON validation failed: {e}")
-        print(f"Sanitized response: {sanitized}")
-        
-        # Additional debugging: show the problematic area
-        error_pos = e.pos
-        if error_pos < len(sanitized):
-            start = max(0, error_pos - 50)
-            end = min(len(sanitized), error_pos + 50)
-            print(f"Error around position {error_pos}: {sanitized[start:end]}")
-        
-        # Try to fix common issues
-        # Remove any trailing commas before closing braces/brackets
-        sanitized = re.sub(r',(\s*[}\]])', r'\1', sanitized)
-        
-        # Try again
-        try:
-            json.loads(sanitized)
-            print("Fixed JSON validation issues")
-            return sanitized
-        except json.JSONDecodeError as e2:
-            print(f"Still invalid JSON after fixes: {e2}")
-            return ""
+    # Step 8: Additional trailing comma fixes
+    sanitized = re.sub(r',(\s*[}\]])', r'\1', sanitized)
+    
+    print(f"Sanitized response length: {len(sanitized)}")
+    print(f"Sanitized response: {sanitized}")
     
     return sanitized
 
