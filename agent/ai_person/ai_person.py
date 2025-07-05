@@ -139,11 +139,27 @@ class AiPerson:
                 print("Error: Failed to sanitize LLM response.")
                 return
                 
+            logger.debug(f"Sanitized response: {sanitized_response}", extra={'agent_id': agent_id})
+            print(f"Sanitized response: {sanitized_response}")
+            
             try:
                 response_json = json.loads(sanitized_response)
-            except Exception as e:
+            except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse sanitized LLM response as JSON: {sanitized_response}", extra={'agent_id': agent_id})
+                logger.error(f"JSON decode error: {e}", extra={'agent_id': agent_id})
                 print(f"Error: Failed to parse LLM response as JSON. {e}")
+                print(f"Error position: {e.pos}")
+                print(f"Error line: {e.lineno}, column: {e.colno}")
+                
+                # Show the problematic area
+                if e.pos < len(sanitized_response):
+                    start = max(0, e.pos - 100)
+                    end = min(len(sanitized_response), e.pos + 100)
+                    print(f"Error around position {e.pos}: {sanitized_response[start:end]}")
+                return
+            except Exception as e:
+                logger.error(f"Unexpected error parsing JSON: {e}", extra={'agent_id': agent_id})
+                print(f"Error: Unexpected error parsing JSON. {e}")
                 return
             logger.debug(f"Parsed LLM response: {json.dumps(response_json, indent=2)}", extra={'agent_id': agent_id})
             print(response_json)
